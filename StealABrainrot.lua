@@ -141,15 +141,32 @@ local function moveToObject(target)
     end
 end
 
-for _, brainrotName in ipairs(brainrotList) do
-    local found = workspace:FindFirstChild(brainrotName)
-    if found then
-        print(brainrotName .. " — идет")
-        moveToObject(found)
-        RootPart = found:FindFirstChild("RootPart")
-        print(RootPart.Position.X, RootPart.Position.Y, RootPart.Position.Z)
-        
-    else
-        print(brainrotName .. " — нету на сцене")
+local function findObjectsInXRange()
+    local minX = -420
+    local maxX = -400
+    
+    print("Поиск объектов в диапазоне X от "..minX.." до "..maxX)
+    
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") or (obj:IsA("Model") and obj.PrimaryPart) then
+            local position
+            if obj:IsA("BasePart") then
+                position = obj.Position
+            else
+                position = obj.PrimaryPart.Position
+            end
+            
+            if position.X >= minX and position.X <= maxX then
+                local fullName = obj:GetFullName()
+                print(string.format("Объект: %s | Позиция: X=%.2f, Y=%.2f, Z=%.2f", 
+                      fullName, position.X, position.Y, position.Z))
+                
+                -- Если хотим автоматически идти к первому найденному объекту:
+                -- moveToObject(obj)
+                -- break
+            end
+        end
     end
 end
+
+findObjectsInXRange
