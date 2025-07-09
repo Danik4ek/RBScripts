@@ -65,7 +65,7 @@ local function simulateKeyPress(key)
     -- Эмулируем нажатие клавиши через VirtualInputManager (если доступен)
     if game:GetService("VirtualInputManager") then
         game:GetService("VirtualInputManager"):SendKeyEvent(true, key, false, nil)
-        task.wait(0.1)
+        task.wait(1)
         game:GetService("VirtualInputManager"):SendKeyEvent(false, key, false, nil)
     else
         -- Альтернативный способ (менее надежный)
