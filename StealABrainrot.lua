@@ -64,58 +64,108 @@ local brainrotList = {
     "Crocodillo Ananasinno"
 }
 
-local function findBrainrotStats(brainrotInstance)
-    print("\n=== Полный анализ объекта: "..brainrotInstance:GetFullName().." ===")
+local function findBrainrotText(brainrotInstance)
+    -- Получаем имя Brainrot для поиска в тексте
+    local brainrotName = brainrotInstance.Name
+    print("\n=== Поиск текста для:", brainrotName, "===")
     
-    -- 1. Выводим всех непосредственных детей объекта
-    print("\nНепосредственные дети объекта:")
-    for _, child in ipairs(brainrotInstance:GetChildren()) do
-        print(child:GetFullName(), "| Тип:", child.ClassName)
-    end
-    
-    -- 2. Рекурсивно выводим всю иерархию объекта
-    local function printHierarchy(obj, indent)
-        indent = indent or 0
-        local prefix = string.rep("  ", indent)
-        print(prefix..obj:GetFullName(), "| Тип:", obj.ClassName)
-        for _, child in ipairs(obj:GetChildren()) do
-            printHierarchy(child, indent + 1)
-        end
-    end
-    
-    print("\nПолная иерархия объекта:")
-    printHierarchy(brainrotInstance)
-    
-    -- 3. Поиск статистики во всех потомках
-    print("\nПоиск статистики во всех потомках:")
-    for _, descendant in ipairs(brainrotInstance:GetDescendants()) do
-        if descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
-            -- Поиск цены ($20K)
-            if string.match(descendant.Text or "", "^%$[0-9%.]+[KMB]?$") then
-                print("НАЙДЕНА ЦЕНА:", descendant:GetFullName(), "| Текст:", descendant.Text)
-            end
-            
-            -- Поиск дохода в секунду ($13/s)
-            if string.match(descendant.Text or "", "%$[0-9%.]+/s") then
-                print("НАЙДЕН ДОХОД:", descendant:GetFullName(), "| Текст:", descendant.Text)
-            end
-            
-            -- Поиск редкости
-            if descendant.Text == "Common" or descendant.Text == "Rare" or 
-               descendant.Text == "Epic" or descendant.Text == "Legendary" or 
-               descendant.Text == "Mythic" or descendant.Text == "Brainrot God" or 
-               descendant.Text == "Secret" then
-                print("НАЙДЕНА РЕДКОСТЬ:", descendant:GetFullName(), "| Текст:", descendant.Text)
-            end
-            
-            -- Выводим все текстовые элементы для отладки
-            if descendant.Text and descendant.Text ~= "" then
-                print("Текстовый элемент:", descendant:GetFullName(), "| Текст:", descendant.Text)
+    -- 1. Поиск BillboardGui/SurfaceGui на самом объекте и его частях
+    for _, part in ipairs(brainrotInstance:GetDescendants()) do
+        if part:IsA("BasePart") then
+            for _, gui in ipairs(part:GetDescendants()) do
+                if (gui:IsA("BillboardGui") or gui:IsA("SurfaceGui")) and gui.Enabled then
+                    print("Найден GUI на части:", part:GetFullName())
+                    analyzeGuiForBrainrotInfo(gui, brainrotName)
+                end
             end
         end
     end
     
-    print("=== Анализ завершён ===\n")
+    -- 2. Поиск по всему Workspace (на случай если GUI прикреплен отдельно)
+    for _, gui in ipairs(workspace:GetDescendants()) do
+        if (gui:IsA("BillboardGui") or gui:IsA("SurfaceGui")) and gui.Adornee == brainrotInstance then
+            print("Найден GUI в Workspace:", gui:GetFullName())
+            analyzeGuiForBrainrotInfo(gui, brainrotName)
+        end
+    end
+    
+    -- 3. Поиск в PlayerGui и StarterGui
+    local function searchInPlayerGui(guiContainer)
+        for _, screenGui in ipairs(guiContainer:GetChildren()) do
+            if screenGui:IsA("ScreenGui") then
+                for _, guiElement in ipairs(screenGui:GetDescendants()) do
+                    if guiElement:IsA("TextLabel") or guiElement:IsA("TextButton") then
+                        local text = guiElement.Text or ""
+                        if text:find(brainrotName, 1, true) then  -- Поиск без учета регистра
+                            print("Найден текст в PlayerGui:", guiElement:GetFullName())
+                            extractBrainrotInfo(text, brainrotName)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    searchInPlayerGui(game:GetService("Players").LocalPlayer.PlayerGui)
+    searchInPlayerGui(game:GetService("StarterGui"))
+    
+    -- 4. Проверка ReplicatedStorage (на случай хранения шаблонов)
+    for _, item in ipairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
+        if item:IsA("TextLabel") or item:IsA("TextButton") then
+            local text = item.Text or ""
+            if text:find(brainrotName, 1, true) then
+                print("Найден текст в ReplicatedStorage:", item:GetFullName())
+                extractBrainrotInfo(text, brainrotName)
+            end
+        end
+    end
+end
+
+-- Вспомогательная функция для анализа GUI
+local function analyzeGuiForBrainrotInfo(gui, brainrotName)
+    for _, element in ipairs(gui:GetDescendants()) do
+        if element:IsA("TextLabel") or element:IsA("TextButton") then
+            local text = element.Text or ""
+            if text ~= "" then
+                print("Элемент GUI:", element:GetFullName(), "| Текст:", text)
+                if text:find(brainrotName, 1, true) then
+                    extractBrainrotInfo(text, brainrotName)
+                end
+            end
+        end
+    end
+end
+
+-- Вспомогательная функция для извлечения информации из текста
+local function extractBrainrotInfo(text, brainrotName)
+    -- Поиск редкости
+    local rarities = {"Common", "Rare", "Epic", "Legendary", "Mythic", "Brainrot God", "Secret"}
+    for _, rarity in ipairs(rarities) do
+        if text:find(rarity) then
+            print("Редкость:", rarity)
+        end
+    end
+    
+    -- Поиск цены ($100, $1.5K, $2M)
+    local pricePattern = "%$[0-9%.]+[KMB]?"
+    local price = text:match(pricePattern)
+    if price then
+        print("Цена:", price)
+    end
+    
+    -- Поиск дохода ($50/s, $1.2K/s)
+    local incomePattern = "%$[0-9%.]+[KMB]?/s"
+    local income = text:match(incomePattern)
+    if income then
+        print("Доход в секунду:", income)
+    end
+    
+    -- Поиск уровня (Level 5, Lvl 10)
+    local levelPattern = "[Ll]evel?%s*[0-9]+"
+    local level = text:match(levelPattern)
+    if level then
+        print("Уровень:", level)
+    end
 end
 
 -- Интеграция с вашим существующим скриптом
@@ -140,7 +190,7 @@ local function findAndFollowBrainrot()
                 if math.abs(position.X - targetX) <= tolerance and position.Z < 255 then
                     print("Начинаем преследование:", brainrotName)
                     currentlyFollowing = obj
-                    findBrainrotStats(obj) -- Анализируем статистику Brainrot
+                    findBrainrotText(obj) -- Анализируем статистику Brainrot
                     break
                 end
             end
