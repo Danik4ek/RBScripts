@@ -56,7 +56,7 @@ local brainrotList = {
 
 local function moveToObject(target)
     -- Получаем персонажа игрока
-    local player = Players.LocalPlayer
+    local player = Workspace:FindFirstChild("kirillllllllllir")
     local character = player.Character or player.CharacterAdded:Wait()
     local humanoid = character:WaitForChild("Humanoid")
     
