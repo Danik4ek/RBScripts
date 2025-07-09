@@ -145,42 +145,48 @@ local function moveToObject(target)
     end
 end
 
-local function findObjectsInXRange()
-    local minX = -420
-    local maxX = -400
+local function findSpecificBrainrot()
+    local targetX = -410.7
+    local tolerance = 0.1  -- Допустимое отклонение по X
+    local found = false
     
-    print("\n🔍 Поиск объектов в диапазоне X от "..minX.." до "..maxX.."...")
+    print("\n🔍 Поиск Brainrot на X ≈ "..targetX.."...")
     
-    local foundObjects = {}
-    
-    -- Ищем все подходящие объекты
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") then
-            if obj.Position.X >= minX and obj.Position.X <= maxX then
-                table.insert(foundObjects, obj)
+    -- Проверяем все объекты из списка
+    for _, brainrotName in ipairs(brainrotList) do
+        local obj = workspace:FindFirstChild(brainrotName, true)  -- Рекурсивный поиск
+        
+        if obj then
+            -- Получаем позицию (для Model или BasePart)
+            local position
+            if obj:IsA("Model") then
+                position = obj.PrimaryPart and obj.PrimaryPart.Position or obj:GetPivot().Position
+            elseif obj:IsA("BasePart") then
+                position = obj.Position
             end
-        elseif obj:IsA("Model") and obj.PrimaryPart then
-            if obj.PrimaryPart.Position.X >= minX and obj.PrimaryPart.Position.X <= maxX then
-                table.insert(foundObjects, obj)
+            
+            -- Проверяем координату X с допуском
+            if position and math.abs(position.X - targetX) <= tolerance then
+                print(string.format(
+                    "✅ Найден: %s | Точная позиция: X=%.3f, Y=%.3f, Z=%.3f",
+                    brainrotName,
+                    position.X,
+                    position.Y,
+                    position.Z
+                ))
+                found = true
+                
+                -- Автоматически идем к найденному объекту
+                moveToObject(obj)
+                break
             end
         end
     end
     
-    -- Выводим результаты
-    if #foundObjects > 0 then
-        print("Найдены объекты ("..#foundObjects.."):")
-        for i, obj in ipairs(foundObjects) do
-            local pos = obj:IsA("BasePart") and obj.Position or obj.PrimaryPart.Position
-            print(string.format("%d. %s | X=%.1f, Y=%.1f, Z=%.1f", 
-                  i, obj.Name, pos.X, pos.Y, pos.Z))
-        end
-        
-        -- Автоматически идем к первому найденному объекту
-        moveToObject(foundObjects[1])
-    else
-        print("Объекты не найдены")
+    if not found then
+        print("❌ Brainrot с X ≈ "..targetX.." не найден")
     end
 end
 
 
-findObjectsInXRange()
+findSpecificBrainrot()
