@@ -58,6 +58,8 @@ for _, brainrotName in ipairs(brainrotList) do
     local found = workspace:FindFirstChild(brainrotName)
     if found then
         print(brainrotName .. " — идет")
+        Position = found:FindFirstChild("RootPart")
+        print(Position.Position.X , Position.Position.Y, Position.Position.Z)
     else
         print(brainrotName .. " — нету на сцене")
     end
