@@ -1,3 +1,7 @@
+local Players = game:GetService("Players")
+local PathfindingService = game:GetService("PathfindingService")
+local RunService = game:GetService("RunService")
+
 local brainrotList = {
     "Noobini pizzanini",
     "Lirilì Larilà",
@@ -145,28 +149,38 @@ local function findObjectsInXRange()
     local minX = -420
     local maxX = -400
     
-    print("Поиск объектов в диапазоне X от "..minX.." до "..maxX)
+    print("\n🔍 Поиск объектов в диапазоне X от "..minX.." до "..maxX.."...")
     
+    local foundObjects = {}
+    
+    -- Ищем все подходящие объекты
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") or (obj:IsA("Model") and obj.PrimaryPart) then
-            local position
-            if obj:IsA("BasePart") then
-                position = obj.Position
-            else
-                position = obj.PrimaryPart.Position
+        if obj:IsA("BasePart") then
+            if obj.Position.X >= minX and obj.Position.X <= maxX then
+                table.insert(foundObjects, obj)
             end
-            
-            if position.X >= minX and position.X <= maxX then
-                local fullName = obj:GetFullName()
-                print(string.format("Объект: %s | Позиция: X=%.2f, Y=%.2f, Z=%.2f", 
-                      fullName, position.X, position.Y, position.Z))
-                
-                -- Если хотим автоматически идти к первому найденному объекту:
-                -- moveToObject(obj)
-                -- break
+        elseif obj:IsA("Model") and obj.PrimaryPart then
+            if obj.PrimaryPart.Position.X >= minX and obj.PrimaryPart.Position.X <= maxX then
+                table.insert(foundObjects, obj)
             end
         end
     end
+    
+    -- Выводим результаты
+    if #foundObjects > 0 then
+        print("Найдены объекты ("..#foundObjects.."):")
+        for i, obj in ipairs(foundObjects) do
+            local pos = obj:IsA("BasePart") and obj.Position or obj.PrimaryPart.Position
+            print(string.format("%d. %s | X=%.1f, Y=%.1f, Z=%.1f", 
+                  i, obj.Name, pos.X, pos.Y, pos.Z))
+        end
+        
+        -- Автоматически идем к первому найденному объекту
+        moveToObject(foundObjects[1])
+    else
+        print("Объекты не найдены")
+    end
 end
 
-findObjectsInXRange
+
+findObjectsInXRange()
