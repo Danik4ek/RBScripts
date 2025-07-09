@@ -53,33 +53,6 @@ local brainrotList = {
     "Ballerino Lololo",
     "Crocodillo Ananasinno"
 }
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-
-local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-
-local function printPosition()
-    local position = humanoidRootPart.Position
-    print(string.format(
-        "Позиция игрока: X=%.2f, Y=%.2f, Z=%.2f (CFrame: %s)",
-        position.X,
-        position.Y,
-        position.Z,
-        tostring(humanoidRootPart.CFrame)
-    ))
-end
-
--- Вариант 1: Вывод при изменении позиции
-local lastPosition
-RunService.Heartbeat:Connect(function()
-    local currentPos = humanoidRootPart.Position
-    if not lastPosition or (currentPos - lastPosition).Magnitude > 1 then
-        lastPosition = currentPos
-        printPosition()
-    end
-end)
 
 local function moveToObject(target)
     -- Проверяем, что скрипт выполняется на клиенте
