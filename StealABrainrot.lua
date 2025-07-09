@@ -81,139 +81,115 @@ local function simulateKeyPress(key)
 end
 
 local function followMovingObject(target)
-    -- Проверка цели
-    if not target or not target:IsDescendantOf(workspace) then
-        print("Цель не существует или не в Workspace")
-        return
-    end
+    if not target or not target:IsDescendantOf(workspace) then return end
 
-    -- Останавливаем предыдущее следование за этой целью
+    -- Останавливаем предыдущее следование
     if activeConnections[target] then
         activeConnections[target]:Disconnect()
         activeConnections[target] = nil
     end
 
-    -- Получаем персонажа
     local player = Players.LocalPlayer
     local character = player.Character or player.CharacterAdded:Wait()
     local humanoid = character:WaitForChild("Humanoid")
     local rootPart = character:WaitForChild("HumanoidRootPart")
 
-    -- Функция для обновления пути
-    local function updatePath()
-        local targetPart = target:FindFirstChild("RootPart") or 
-                         target:FindFirstChildWhichIsA("BasePart") or
-                         target.PrimaryPart
+    -- Оптимизация: кешируем targetPart
+    local targetPart = target:FindFirstChild("HumanoidRootPart") or 
+                     target:FindFirstChildWhichIsA("BasePart") or
+                     target.PrimaryPart
+    if not targetPart then return end
 
-        if not targetPart then
-            print("У цели нет подходящей части для перемещения")
-            return
-        end
+    local lastPathUpdate = 0
+    local lastPosition = targetPart.Position
 
-        -- Проверяем расстояние до цели
+    activeConnections[target] = RunService.Heartbeat:Connect(function(deltaTime)
+        -- Быстрая проверка расстояния для взаимодействия
         local distance = (targetPart.Position - rootPart.Position).Magnitude
         
-        -- Если игрок достаточно близко, эмулируем нажатие E
-        if distance < 5 then
+        -- Приоритет: если очень близко - спамим E
+        if distance < 8 then
             simulateKeyPress(Enum.KeyCode.E)
-            return
-        end
-
-        -- Создаем новый путь
-        local path = PathfindingService:CreatePath({
-            AgentRadius = 1.5,
-            AgentHeight = 5,
-            AgentCanJump = true
-        })
-
-        -- Вычисляем маршрут
-        local success, err = pcall(function()
-            path:ComputeAsync(rootPart.Position, targetPart.Position)
-        end)
-
-        if not success then
-            print("Ошибка расчета пути:", err)
-            return
-        end
-
-        -- Движение по новым точкам
-        if path.Status == Enum.PathStatus.Success then
-            for _, waypoint in ipairs(path:GetWaypoints()) do
-                -- Проверяем расстояние перед каждым движением
-                local currentDistance = (targetPart.Position - rootPart.Position).Magnitude
-                if currentDistance < 5 then
-                    simulateKeyPress(Enum.KeyCode.E)
-                    break
-                end
-                
-                humanoid:MoveTo(waypoint.Position)
-                if waypoint.Action == Enum.PathWaypointAction.Jump then
-                    humanoid.Jump = true
-                end
-                
-                -- Прерываем движение, если цель слишком далеко
-                if (targetPart.Position - rootPart.Position).Magnitude > 100 then
-                    break
-                end
-                
-                humanoid.MoveToFinished:Wait()
+            
+            -- Дополнительное приближение если не достаточно близко
+            if distance > 3 then
+                humanoid:MoveTo(targetPart.Position)
+            else
+                humanoid:MoveTo(rootPart.Position) -- Стоим на месте
             end
+            return
         end
-    end
 
-    -- Запускаем постоянное обновление пути
-    activeConnections[target] = RunService.Heartbeat:Connect(function()
-        -- Проверяем расстояние до цели
-        local targetPart = target:FindFirstChildWhichIsA("BasePart") or target.PrimaryPart
-        if not targetPart then return end
-        
-        local distance = (targetPart.Position - rootPart.Position).Magnitude
-        
-        -- Если цель слишком далеко, прекращаем преследование
-        if distance > 150 then
-            print("Цель слишком далеко, прекращаем преследование")
-            activeConnections[target]:Disconnect()
-            activeConnections[target] = nil
-            return
-        end
-        
-        -- Если игрок достаточно близко, эмулируем нажатие E
-        if distance < 5 then
-            simulateKeyPress(Enum.KeyCode.E)
-            return
-        end
-        
-        -- Обновляем путь каждые 0.5 секунды или если цель значительно сместилась
-        if distance > 10 then
-            updatePath()
+        -- Обновляем путь только если:
+        -- 1. Прошло >0.5 сек с последнего обновления
+        -- 2. Цель сместилась >5 studs
+        -- 3. Мы не слишком близко
+        if (os.clock() - lastPathUpdate > 0.5) or 
+           ((targetPart.Position - lastPosition).Magnitude > 5) then
+            
+            lastPathUpdate = os.clock()
+            lastPosition = targetPart.Position
+            
+            local path = PathfindingService:CreatePath({
+                AgentRadius = 2,
+                AgentHeight = 5,
+                AgentCanJump = true
+            })
+
+            local success = pcall(function()
+                path:ComputeAsync(rootPart.Position, targetPart.Position)
+            end)
+
+            if success and path.Status == Enum.PathStatus.Success then
+                -- Очищаем текущее движение
+                humanoid:MoveTo(rootPart.Position)
+                
+                for _, waypoint in ipairs(path:GetWaypoints()) do
+                    -- Проверяем актуальность цели
+                    if (targetPart.Position - rootPart.Position).Magnitude > 100 then break end
+                    
+                    humanoid:MoveTo(waypoint.Position)
+                    if waypoint.Action == Enum.PathWaypointAction.Jump then
+                        humanoid.Jump = true
+                    end
+                    
+                    -- Быстрая проверка расстояния во время движения
+                    if (targetPart.Position - rootPart.Position).Magnitude < 8 then
+                        simulateKeyPress(Enum.KeyCode.E)
+                        break
+                    end
+                    
+                    -- Ждем либо завершения движения, либо изменения расстояния
+                    local startTime = os.clock()
+                    while os.clock() - startTime < 1 and 
+                          (humanoid.MoveDirection.Magnitude > 0.1) and
+                          (targetPart.Position - rootPart.Position).Magnitude > 5 do
+                        task.wait()
+                    end
+                end
+            end
         end
     end)
 end
 
 local function findAndFollowBrainrot()
     local targetX = -410.7
-    local tolerance = 0.5  -- Увеличили допуск для движущихся целей
+    local tolerance = 2.0  -- Увеличенный допуск
     
-    for _, brainrotName in ipairs(brainrotList) do
-        local obj = workspace:FindFirstChild(brainrotName, true)
-        
-        if obj then
-            local position
-            if obj:IsA("Model") then
-                position = obj.PrimaryPart and obj.PrimaryPart.Position or obj:GetPivot().Position
-            elseif obj:IsA("BasePart") then
-                position = obj.Position
-            end
-            
-            if position and math.abs(position.X - targetX) <= tolerance then
-                print("Начинаем преследование:", brainrotName)
-                followMovingObject(obj)
-                return  -- Начинаем следить за первым найденным
+    while task.wait(0.5) do  -- Постоянный поиск цели
+        for _, brainrotName in ipairs(brainrotList) do
+            local obj = workspace:FindFirstChild(brainrotName, true)
+            if obj then
+                local position = obj:GetPivot().Position
+                if math.abs(position.X - targetX) <= tolerance then
+                    print("Начинаем преследование:", brainrotName)
+                    followMovingObject(obj)
+                    return
+                end
             end
         end
+        print("Поиск цели...")
     end
-    
-    print("Подходящий Brainrot не найден")
 end
 
 findAndFollowBrainrot()
