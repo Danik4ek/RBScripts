@@ -62,19 +62,22 @@ local brainrotList = {
 }
 
 local function simulateKeyPress(key)
-    -- Эмулируем нажатие клавиши
-    local inputObject = Instance.new("InputObject")
-    inputObject.KeyCode = key
-    inputObject.UserInputType = Enum.UserInputType.Keyboard
-    inputObject.UserInputState = Enum.UserInputState.Begin
-    
-    UserInputService:ProcessInput(inputObject)
-    
-    -- Через небольшой промежуток времени эмулируем отпускание клавиши
-    task.delay(0.1, function()
-        inputObject.UserInputState = Enum.UserInputState.End
-        UserInputService:ProcessInput(inputObject)
-    end)
+    -- Эмулируем нажатие клавиши через VirtualInputManager (если доступен)
+    if game:GetService("VirtualInputManager") then
+        game:GetService("VirtualInputManager"):SendKeyEvent(true, key, false, nil)
+        task.wait(0.1)
+        game:GetService("VirtualInputManager"):SendKeyEvent(false, key, false, nil)
+    else
+        -- Альтернативный способ (менее надежный)
+        local player = Players.LocalPlayer
+        local character = player.Character
+        if character then
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping) -- Эмулируем действие (например, прыжок)
+            end
+        end
+    end
 end
 
 local function followMovingObject(target)
@@ -111,7 +114,7 @@ local function followMovingObject(target)
         local distance = (targetPart.Position - rootPart.Position).Magnitude
         
         -- Если игрок достаточно близко, эмулируем нажатие E
-        if distance < 5 then  -- Можете настроить это расстояние по своему усмотрению
+        if distance < 5 then
             simulateKeyPress(Enum.KeyCode.E)
             return
         end
