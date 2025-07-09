@@ -64,20 +64,18 @@ local brainrotList = {
 
 local isHoldingE = false
 local lastEPressTime = 0
+local currentlyFollowing = nil
 
 local function simulateKeyPress(key, holdDuration)
     if not VirtualInputManager then return end
     
-    -- Если уже удерживаем E, сначала отпускаем
     if isHoldingE and key == Enum.KeyCode.E then
         VirtualInputManager:SendKeyEvent(false, key, false, nil)
         isHoldingE = false
     end
     
-    -- Нажимаем клавишу
     VirtualInputManager:SendKeyEvent(true, key, false, nil)
     
-    -- Если указано время удержания
     if holdDuration then
         isHoldingE = true
         task.delay(holdDuration, function()
@@ -87,7 +85,6 @@ local function simulateKeyPress(key, holdDuration)
             end
         end)
     else
-        -- Короткое нажатие
         task.delay(0.05, function()
             VirtualInputManager:SendKeyEvent(false, key, false, nil)
         end)
@@ -106,10 +103,10 @@ end
 local function followMovingObject(target)
     if not target or not target:IsDescendantOf(workspace) then 
         releaseAllKeys()
+        currentlyFollowing = nil
         return 
     end
 
-    -- Останавливаем предыдущее следование
     if activeConnections[target] then
         releaseAllKeys()
         activeConnections[target]:Disconnect()
@@ -126,9 +123,11 @@ local function followMovingObject(target)
                      target.PrimaryPart
     if not targetPart then 
         releaseAllKeys()
+        currentlyFollowing = nil
         return 
     end
 
+    currentlyFollowing = target
     local lastPathUpdate = 0
     local lastPosition = targetPart.Position
     local shouldContinue = true
@@ -136,27 +135,24 @@ local function followMovingObject(target)
     activeConnections[target] = RunService.Heartbeat:Connect(function()
         if not shouldContinue then return end
         
-        -- Проверяем позицию цели по Z
         if targetPart.Position.Z >= 255 then
             print("Цель достигла Z ≥ 255, прекращаем преследование")
             humanoid:MoveTo(rootPart.Position)
             releaseAllKeys()
             activeConnections[target]:Disconnect()
             activeConnections[target] = nil
+            currentlyFollowing = nil
             shouldContinue = false
             return
         end
 
         local distance = (targetPart.Position - rootPart.Position).Magnitude
         
-        -- Если очень близко - удерживаем E
         if distance < 5 then
-            -- Нажимаем E только если прошло больше 0.5 сек с последнего нажатия
             if os.clock() - lastEPressTime > 0.5 then
-                simulateKeyPress(Enum.KeyCode.E, 1) -- Удерживаем 1 секунду
+                simulateKeyPress(Enum.KeyCode.E, 1)
             end
             
-            -- Плавное приближение
             if distance > 1.5 then
                 humanoid:MoveTo(targetPart.Position)
             else
@@ -167,7 +163,6 @@ local function followMovingObject(target)
             releaseAllKeys()
         end
 
-        -- Обновляем путь с учетом частоты
         if (os.clock() - lastPathUpdate > 0.3) or 
            ((targetPart.Position - lastPosition).Magnitude > 3) then
             
@@ -196,7 +191,6 @@ local function followMovingObject(target)
                         humanoid.Jump = true
                     end
                     
-                    -- Проверка расстояния во время движения
                     if (targetPart.Position - rootPart.Position).Magnitude < 5 then
                         if os.clock() - lastEPressTime > 0.5 then
                             simulateKeyPress(Enum.KeyCode.E, 1)
@@ -216,14 +210,25 @@ local function findAndFollowBrainrot()
     local tolerance = 2.0
     
     while task.wait(0.3) do
+        -- Не ищем новую цель, если уже следим за кем-то
+        if currentlyFollowing and currentlyFollowing:IsDescendantOf(workspace) then
+            local targetPos = currentlyFollowing:GetPivot().Position
+            if math.abs(targetPos.X - targetX) <= tolerance and targetPos.Z < 255 then
+                -- Цель все еще валидна, продолжаем следить
+                continue
+            else
+                -- Цель больше не подходит
+                currentlyFollowing = nil
+            end
+        end
+
         for _, brainrotName in ipairs(brainrotList) do
             local obj = workspace:FindFirstChild(brainrotName, true)
-            if obj then
+            if obj and obj ~= currentlyFollowing then
                 local position = obj:GetPivot().Position
                 if math.abs(position.X - targetX) <= tolerance and position.Z < 255 then
                     print("Начинаем преследование:", brainrotName)
                     followMovingObject(obj)
-                    task.wait(1)
                     break
                 end
             end
