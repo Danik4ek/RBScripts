@@ -55,18 +55,41 @@ local brainrotList = {
 }
 
 local function moveToObject(target)
-    -- Получаем персонажа игрока
-    local player = Workspace:FindFirstChild("kirillllllllllir")
-    local character = player.Character or player.CharacterAdded:Wait()
-    local humanoid = character:WaitForChild("Humanoid")
+    -- Проверяем, что скрипт выполняется на клиенте
+    if not game:GetService("RunService"):IsClient() then
+        error("Эта функция должна работать в LocalScript")
+        return false
+    end
+
+    -- Получаем сервисы
+    local Players = game:GetService("Players")
+    local PathfindingService = game:GetService("PathfindingService")
     
-    -- Проверяем что цель существует
+    -- Получаем персонажа игрока с проверкой
+    local player = Players.LocalPlayer
+    if not player then return false end
+    
+    local character = player.Character
+    if not character then
+        player.CharacterAdded:Wait()
+        character = player.Character
+    end
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if not humanoid or not rootPart then
+        print("У персонажа нет необходимых компонентов")
+        return false
+    end
+
+    -- Проверка цели
     if not target or not target:IsDescendantOf(workspace) then
-        print("Цель не существует или не находится в Workspace")
+        print("Цель не существует или не в Workspace")
         return false
     end
     
-    -- Находим RootPart цели (или любую BasePart)
+    -- Поиск целевой части
     local targetPart = target:FindFirstChild("RootPart") or 
                       target:FindFirstChildWhichIsA("BasePart") or
                       target.PrimaryPart
@@ -75,31 +98,45 @@ local function moveToObject(target)
         print("У цели нет подходящей части для перемещения")
         return false
     end
-    
-    -- Создаем путь
+
+    -- Настройка и расчет пути
     local path = PathfindingService:CreatePath({
-        AgentRadius = 2,
+        AgentRadius = 1.5,
         AgentHeight = 5,
         AgentCanJump = true
     })
     
-    -- Вычисляем маршрут
-    path:ComputeAsync(character.HumanoidRootPart.Position, targetPart.Position)
+    local success, errorMsg = pcall(function()
+        path:ComputeAsync(rootPart.Position, targetPart.Position)
+    end)
     
+    if not success then
+        print("Ошибка расчета пути:", errorMsg)
+        return false
+    end
+
+    -- Движение по точкам
     if path.Status == Enum.PathStatus.Success then
-        -- Проходим по точкам маршрута
         for _, waypoint in ipairs(path:GetWaypoints()) do
             humanoid:MoveTo(waypoint.Position)
-            humanoid.MoveToFinished:Wait()
             
+            local reached
             if waypoint.Action == Enum.PathWaypointAction.Jump then
                 humanoid.Jump = true
+                reached = humanoid.MoveToFinished:Wait()  -- Ждем завершения прыжка
+            else
+                reached = humanoid.MoveToFinished:Wait()  -- Ждем достижения точки
+            end
+            
+            if not reached then
+                print("Прервано перед достижением точки")
+                return false
             end
         end
-        print("Достигли цели!")
+        print("Успешно достигли цели!")
         return true
     else
-        print("Не удалось построить маршрут")
+        print("Не удалось построить маршрут. Статус:", path.Status)
         return false
     end
 end
