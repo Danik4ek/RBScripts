@@ -2,6 +2,7 @@ local Players = game:GetService("Players")
 local PathfindingService = game:GetService("PathfindingService")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local activeConnections = {}
 
 
@@ -61,30 +62,56 @@ local brainrotList = {
     "Crocodillo Ananasinno"
 }
 
-local function simulateKeyPress(key)
-    -- Эмулируем нажатие клавиши через VirtualInputManager (если доступен)
-    if game:GetService("VirtualInputManager") then
-        game:GetService("VirtualInputManager"):SendKeyEvent(true, key, false, nil)
-        task.wait(1)
-        game:GetService("VirtualInputManager"):SendKeyEvent(false, key, false, nil)
-    else
-        -- Альтернативный способ (менее надежный)
-        local player = Players.LocalPlayer
-        local character = player.Character
-        if character then
-            local humanoid = character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                humanoid:ChangeState(Enum.HumanoidStateType.Jumping) -- Эмулируем действие (например, прыжок)
+local isHoldingE = false
+local lastEPressTime = 0
+
+local function simulateKeyPress(key, holdDuration)
+    if not VirtualInputManager then return end
+    
+    -- Если уже удерживаем E, сначала отпускаем
+    if isHoldingE and key == Enum.KeyCode.E then
+        VirtualInputManager:SendKeyEvent(false, key, false, nil)
+        isHoldingE = false
+    end
+    
+    -- Нажимаем клавишу
+    VirtualInputManager:SendKeyEvent(true, key, false, nil)
+    
+    -- Если указано время удержания
+    if holdDuration then
+        isHoldingE = true
+        task.delay(holdDuration, function()
+            if isHoldingE then
+                VirtualInputManager:SendKeyEvent(false, key, false, nil)
+                isHoldingE = false
             end
-        end
+        end)
+    else
+        -- Короткое нажатие
+        task.delay(0.05, function()
+            VirtualInputManager:SendKeyEvent(false, key, false, nil)
+        end)
+    end
+    
+    lastEPressTime = os.clock()
+end
+
+local function releaseAllKeys()
+    if isHoldingE then
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, nil)
+        isHoldingE = false
     end
 end
 
 local function followMovingObject(target)
-    if not target or not target:IsDescendantOf(workspace) then return end
+    if not target or not target:IsDescendantOf(workspace) then 
+        releaseAllKeys()
+        return 
+    end
 
     -- Останавливаем предыдущее следование
     if activeConnections[target] then
+        releaseAllKeys()
         activeConnections[target]:Disconnect()
         activeConnections[target] = nil
     end
@@ -94,46 +121,54 @@ local function followMovingObject(target)
     local humanoid = character:WaitForChild("Humanoid")
     local rootPart = character:WaitForChild("HumanoidRootPart")
 
-    -- Оптимизация: кешируем targetPart
     local targetPart = target:FindFirstChild("HumanoidRootPart") or 
                      target:FindFirstChildWhichIsA("BasePart") or
                      target.PrimaryPart
-    if not targetPart then return end
+    if not targetPart then 
+        releaseAllKeys()
+        return 
+    end
 
     local lastPathUpdate = 0
     local lastPosition = targetPart.Position
+    local shouldContinue = true
 
-    activeConnections[target] = RunService.Heartbeat:Connect(function(deltaTime)
+    activeConnections[target] = RunService.Heartbeat:Connect(function()
+        if not shouldContinue then return end
+        
         -- Проверяем позицию цели по Z
         if targetPart.Position.Z >= 255 then
             print("Цель достигла Z ≥ 255, прекращаем преследование")
-            humanoid:MoveTo(rootPart.Position) -- Останавливаемся
+            humanoid:MoveTo(rootPart.Position)
+            releaseAllKeys()
             activeConnections[target]:Disconnect()
             activeConnections[target] = nil
+            shouldContinue = false
             return
         end
 
-        -- Быстрая проверка расстояния для взаимодействия
         local distance = (targetPart.Position - rootPart.Position).Magnitude
         
-        -- Приоритет: если очень близко - спамим E
-        if distance < 8 then
-            simulateKeyPress(Enum.KeyCode.E)
+        -- Если очень близко - удерживаем E
+        if distance < 5 then
+            -- Нажимаем E только если прошло больше 0.5 сек с последнего нажатия
+            if os.clock() - lastEPressTime > 0.5 then
+                simulateKeyPress(Enum.KeyCode.E, 1) -- Удерживаем 1 секунду
+            end
             
-            -- Дополнительное приближение если не достаточно близко
-            if distance > 1 then
+            -- Плавное приближение
+            if distance > 1.5 then
                 humanoid:MoveTo(targetPart.Position)
             else
-                humanoid:MoveTo(rootPart.Position) -- Стоим на месте
+                humanoid:MoveTo(rootPart.Position)
             end
             return
+        else
+            releaseAllKeys()
         end
 
-        -- Обновляем путь только если:
-        -- 1. Прошло >0.5 сек с последнего обновления
-        -- 2. Цель сместилась >3 studs
-        -- 3. Мы не слишком близко
-        if (os.clock() - lastPathUpdate > 0.5) or 
+        -- Обновляем путь с учетом частоты
+        if (os.clock() - lastPathUpdate > 0.3) or 
            ((targetPart.Position - lastPosition).Magnitude > 3) then
             
             lastPathUpdate = os.clock()
@@ -150,34 +185,26 @@ local function followMovingObject(target)
             end)
 
             if success and path.Status == Enum.PathStatus.Success then
-                -- Очищаем текущее движение
                 humanoid:MoveTo(rootPart.Position)
                 
                 for _, waypoint in ipairs(path:GetWaypoints()) do
-                    -- Проверяем позицию цели по Z
+                    if not shouldContinue then break end
                     if targetPart.Position.Z >= 255 then break end
-                    
-                    -- Проверяем актуальность цели
-                    if (targetPart.Position - rootPart.Position).Magnitude > 100 then break end
                     
                     humanoid:MoveTo(waypoint.Position)
                     if waypoint.Action == Enum.PathWaypointAction.Jump then
                         humanoid.Jump = true
                     end
                     
-                    -- Быстрая проверка расстояния во время движения
-                    if (targetPart.Position - rootPart.Position).Magnitude < 8 then
-                        simulateKeyPress(Enum.KeyCode.E)
+                    -- Проверка расстояния во время движения
+                    if (targetPart.Position - rootPart.Position).Magnitude < 5 then
+                        if os.clock() - lastEPressTime > 0.5 then
+                            simulateKeyPress(Enum.KeyCode.E, 1)
+                        end
                         break
                     end
                     
-                    -- Ждем либо завершения движения, либо изменения расстояния
-                    local startTime = os.clock()
-                    while os.clock() - startTime < 1 and 
-                          (humanoid.MoveDirection.Magnitude > 0.1) and
-                          (targetPart.Position - rootPart.Position).Magnitude > 5 do
-                        task.wait()
-                    end
+                    task.wait(0.1)
                 end
             end
         end
@@ -186,21 +213,21 @@ end
 
 local function findAndFollowBrainrot()
     local targetX = -410.7
-    local tolerance = 2.0  -- Увеличенный допуск
+    local tolerance = 2.0
     
-    while task.wait(0.5) do  -- Постоянный поиск цели
+    while task.wait(0.3) do
         for _, brainrotName in ipairs(brainrotList) do
             local obj = workspace:FindFirstChild(brainrotName, true)
             if obj then
                 local position = obj:GetPivot().Position
-                if math.abs(position.X - targetX) <= tolerance then
+                if math.abs(position.X - targetX) <= tolerance and position.Z < 255 then
                     print("Начинаем преследование:", brainrotName)
                     followMovingObject(obj)
-                    return
+                    task.wait(1)
+                    break
                 end
             end
         end
-        print("Поиск цели...")
     end
 end
 
