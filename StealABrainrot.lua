@@ -64,6 +64,40 @@ local brainrotList = {
     "Crocodillo Ananasinno"
 }
 
+local function simulateKeyPress(key, holdDuration)
+    if not VirtualInputManager then return end
+    
+    if isHoldingE and key == Enum.KeyCode.E then
+        VirtualInputManager:SendKeyEvent(false, key, false, nil)
+        isHoldingE = false
+    end
+    
+    VirtualInputManager:SendKeyEvent(true, key, false, nil)
+    
+    if holdDuration then
+        isHoldingE = true
+        task.delay(holdDuration, function()
+            if isHoldingE then
+                VirtualInputManager:SendKeyEvent(false, key, false, nil)
+                isHoldingE = false
+            end
+        end)
+    else
+        task.delay(0.05, function()
+            VirtualInputManager:SendKeyEvent(false, key, false, nil)
+        end)
+    end
+    
+    lastEPressTime = os.clock()
+end
+
+local function releaseAllKeys()
+    if isHoldingE then
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, nil)
+        isHoldingE = false
+    end
+end
+
 local function followMovingObject(target)
     if not target or not target:IsDescendantOf(workspace) then 
         releaseAllKeys()
