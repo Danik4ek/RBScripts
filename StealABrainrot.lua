@@ -147,6 +147,7 @@ for _, brainrotName in ipairs(brainrotList) do
         print(brainrotName .. " — идет")
         moveToObject(found)
         RootPart = found:FindFirstChild("RootPart")
+        print(RootPart.Position.X, RootPart.Position.Y, RootPart.Position.Z)
     else
         print(brainrotName .. " — нету на сцене")
     end
