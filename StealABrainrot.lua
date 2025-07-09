@@ -112,7 +112,7 @@ local function followMovingObject(target)
             simulateKeyPress(Enum.KeyCode.E)
             
             -- Дополнительное приближение если не достаточно близко
-            if distance > 3 then
+            if distance > 1 then
                 humanoid:MoveTo(targetPart.Position)
             else
                 humanoid:MoveTo(rootPart.Position) -- Стоим на месте
@@ -125,7 +125,7 @@ local function followMovingObject(target)
         -- 2. Цель сместилась >5 studs
         -- 3. Мы не слишком близко
         if (os.clock() - lastPathUpdate > 0.5) or 
-           ((targetPart.Position - lastPosition).Magnitude > 5) then
+           ((targetPart.Position - lastPosition).Magnitude > 3) then
             
             lastPathUpdate = os.clock()
             lastPosition = targetPart.Position
