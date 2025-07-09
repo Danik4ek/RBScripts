@@ -54,12 +54,62 @@ local brainrotList = {
     "Crocodillo Ananasinno"
 }
 
+local function moveToObject(target)
+    -- Получаем персонажа игрока
+    local player = Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+    
+    -- Проверяем что цель существует
+    if not target or not target:IsDescendantOf(workspace) then
+        print("Цель не существует или не находится в Workspace")
+        return false
+    end
+    
+    -- Находим RootPart цели (или любую BasePart)
+    local targetPart = target:FindFirstChild("RootPart") or 
+                      target:FindFirstChildWhichIsA("BasePart") or
+                      target.PrimaryPart
+    
+    if not targetPart then
+        print("У цели нет подходящей части для перемещения")
+        return false
+    end
+    
+    -- Создаем путь
+    local path = PathfindingService:CreatePath({
+        AgentRadius = 2,
+        AgentHeight = 5,
+        AgentCanJump = true
+    })
+    
+    -- Вычисляем маршрут
+    path:ComputeAsync(character.HumanoidRootPart.Position, targetPart.Position)
+    
+    if path.Status == Enum.PathStatus.Success then
+        -- Проходим по точкам маршрута
+        for _, waypoint in ipairs(path:GetWaypoints()) do
+            humanoid:MoveTo(waypoint.Position)
+            humanoid.MoveToFinished:Wait()
+            
+            if waypoint.Action == Enum.PathWaypointAction.Jump then
+                humanoid.Jump = true
+            end
+        end
+        print("Достигли цели!")
+        return true
+    else
+        print("Не удалось построить маршрут")
+        return false
+    end
+end
+
 for _, brainrotName in ipairs(brainrotList) do
     local found = workspace:FindFirstChild(brainrotName)
     if found then
         print(brainrotName .. " — идет")
-        Position = found:FindFirstChild("RootPart")
-        print(Position.Position.X , Position.Position.Y, Position.Position.Z)
+        moveToObject(found)
+        RootPart = found:FindFirstChild("RootPart")
     else
         print(brainrotName .. " — нету на сцене")
     end
