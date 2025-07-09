@@ -1,7 +1,9 @@
 local Players = game:GetService("Players")
 local PathfindingService = game:GetService("PathfindingService")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local activeConnections = {}
+
 
 local brainrotList = {
     "Noobini pizzanini",
@@ -59,6 +61,22 @@ local brainrotList = {
     "Crocodillo Ananasinno"
 }
 
+local function simulateKeyPress(key)
+    -- Эмулируем нажатие клавиши
+    local inputObject = Instance.new("InputObject")
+    inputObject.KeyCode = key
+    inputObject.UserInputType = Enum.UserInputType.Keyboard
+    inputObject.UserInputState = Enum.UserInputState.Begin
+    
+    UserInputService:ProcessInput(inputObject)
+    
+    -- Через небольшой промежуток времени эмулируем отпускание клавиши
+    task.delay(0.1, function()
+        inputObject.UserInputState = Enum.UserInputState.End
+        UserInputService:ProcessInput(inputObject)
+    end)
+end
+
 local function followMovingObject(target)
     -- Проверка цели
     if not target or not target:IsDescendantOf(workspace) then
@@ -89,6 +107,15 @@ local function followMovingObject(target)
             return
         end
 
+        -- Проверяем расстояние до цели
+        local distance = (targetPart.Position - rootPart.Position).Magnitude
+        
+        -- Если игрок достаточно близко, эмулируем нажатие E
+        if distance < 5 then  -- Можете настроить это расстояние по своему усмотрению
+            simulateKeyPress(Enum.KeyCode.E)
+            return
+        end
+
         -- Создаем новый путь
         local path = PathfindingService:CreatePath({
             AgentRadius = 1.5,
@@ -109,6 +136,13 @@ local function followMovingObject(target)
         -- Движение по новым точкам
         if path.Status == Enum.PathStatus.Success then
             for _, waypoint in ipairs(path:GetWaypoints()) do
+                -- Проверяем расстояние перед каждым движением
+                local currentDistance = (targetPart.Position - rootPart.Position).Magnitude
+                if currentDistance < 5 then
+                    simulateKeyPress(Enum.KeyCode.E)
+                    break
+                end
+                
                 humanoid:MoveTo(waypoint.Position)
                 if waypoint.Action == Enum.PathWaypointAction.Jump then
                     humanoid.Jump = true
@@ -137,6 +171,12 @@ local function followMovingObject(target)
             print("Цель слишком далеко, прекращаем преследование")
             activeConnections[target]:Disconnect()
             activeConnections[target] = nil
+            return
+        end
+        
+        -- Если игрок достаточно близко, эмулируем нажатие E
+        if distance < 5 then
+            simulateKeyPress(Enum.KeyCode.E)
             return
         end
         
