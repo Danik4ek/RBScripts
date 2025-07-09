@@ -132,6 +132,7 @@ local function findAndFollowBrainrot()
                 local position = obj:GetPivot().Position
                 if math.abs(position.X - targetX) <= tolerance and position.Z < 255 then
                     print("Начинаем преследование:", brainrotName)
+                    currentlyFollowing = obj
                     findBrainrotStats(obj) -- Анализируем статистику Brainrot
                     break
                 end
