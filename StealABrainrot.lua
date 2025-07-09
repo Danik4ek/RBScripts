@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local PathfindingService = game:GetService("PathfindingService")
 local RunService = game:GetService("RunService")
+local activeConnections = {}
 
 local brainrotList = {
     "Noobini pizzanini",
@@ -58,106 +59,102 @@ local brainrotList = {
     "Crocodillo Ananasinno"
 }
 
-local function moveToObject(target)
-    -- Проверяем, что скрипт выполняется на клиенте
-    if not game:GetService("RunService"):IsClient() then
-        error("Эта функция должна работать в LocalScript")
-        return false
-    end
-
-    -- Получаем сервисы
-    local Players = game:GetService("Players")
-    local PathfindingService = game:GetService("PathfindingService")
-    
-    -- Получаем персонажа игрока с проверкой
-    local player = Players.LocalPlayer
-    if not player then return false end
-    
-    local character = player.Character
-    if not character then
-        player.CharacterAdded:Wait()
-        character = player.Character
-    end
-    
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    
-    if not humanoid or not rootPart then
-        print("У персонажа нет необходимых компонентов")
-        return false
-    end
-
+local function followMovingObject(target)
     -- Проверка цели
     if not target or not target:IsDescendantOf(workspace) then
         print("Цель не существует или не в Workspace")
-        return false
-    end
-    
-    -- Поиск целевой части
-    local targetPart = target:FindFirstChild("RootPart") or 
-                      target:FindFirstChildWhichIsA("BasePart") or
-                      target.PrimaryPart
-    
-    if not targetPart then
-        print("У цели нет подходящей части для перемещения")
-        return false
+        return
     end
 
-    -- Настройка и расчет пути
-    local path = PathfindingService:CreatePath({
-        AgentRadius = 1.5,
-        AgentHeight = 5,
-        AgentCanJump = true
-    })
-    
-    local success, errorMsg = pcall(function()
-        path:ComputeAsync(rootPart.Position, targetPart.Position)
-    end)
-    
-    if not success then
-        print("Ошибка расчета пути:", errorMsg)
-        return false
+    -- Останавливаем предыдущее следование за этой целью
+    if activeConnections[target] then
+        activeConnections[target]:Disconnect()
+        activeConnections[target] = nil
     end
 
-    -- Движение по точкам
-    if path.Status == Enum.PathStatus.Success then
-        for _, waypoint in ipairs(path:GetWaypoints()) do
-            humanoid:MoveTo(waypoint.Position)
-            
-            local reached
-            if waypoint.Action == Enum.PathWaypointAction.Jump then
-                humanoid.Jump = true
-                reached = humanoid.MoveToFinished:Wait()  -- Ждем завершения прыжка
-            else
-                reached = humanoid.MoveToFinished:Wait()  -- Ждем достижения точки
-            end
-            
-            if not reached then
-                print("Прервано перед достижением точки")
-                return false
+    -- Получаем персонажа
+    local player = Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+    local rootPart = character:WaitForChild("HumanoidRootPart")
+
+    -- Функция для обновления пути
+    local function updatePath()
+        local targetPart = target:FindFirstChild("RootPart") or 
+                         target:FindFirstChildWhichIsA("BasePart") or
+                         target.PrimaryPart
+
+        if not targetPart then
+            print("У цели нет подходящей части для перемещения")
+            return
+        end
+
+        -- Создаем новый путь
+        local path = PathfindingService:CreatePath({
+            AgentRadius = 1.5,
+            AgentHeight = 5,
+            AgentCanJump = true
+        })
+
+        -- Вычисляем маршрут
+        local success, err = pcall(function()
+            path:ComputeAsync(rootPart.Position, targetPart.Position)
+        end)
+
+        if not success then
+            print("Ошибка расчета пути:", err)
+            return
+        end
+
+        -- Движение по новым точкам
+        if path.Status == Enum.PathStatus.Success then
+            for _, waypoint in ipairs(path:GetWaypoints()) do
+                humanoid:MoveTo(waypoint.Position)
+                if waypoint.Action == Enum.PathWaypointAction.Jump then
+                    humanoid.Jump = true
+                end
+                
+                -- Прерываем движение, если цель слишком далеко
+                if (targetPart.Position - rootPart.Position).Magnitude > 100 then
+                    break
+                end
+                
+                humanoid.MoveToFinished:Wait()
             end
         end
-        print("Успешно достигли цели!")
-        return true
-    else
-        print("Не удалось построить маршрут. Статус:", path.Status)
-        return false
     end
+
+    -- Запускаем постоянное обновление пути
+    activeConnections[target] = RunService.Heartbeat:Connect(function()
+        -- Проверяем расстояние до цели
+        local targetPart = target:FindFirstChildWhichIsA("BasePart") or target.PrimaryPart
+        if not targetPart then return end
+        
+        local distance = (targetPart.Position - rootPart.Position).Magnitude
+        
+        -- Если цель слишком далеко, прекращаем преследование
+        if distance > 150 then
+            print("Цель слишком далеко, прекращаем преследование")
+            activeConnections[target]:Disconnect()
+            activeConnections[target] = nil
+            return
+        end
+        
+        -- Обновляем путь каждые 0.5 секунды или если цель значительно сместилась
+        if distance > 10 then
+            updatePath()
+        end
+    end)
 end
 
-local function findSpecificBrainrot()
+local function findAndFollowBrainrot()
     local targetX = -410.7
-    local tolerance = 0.1  -- Допустимое отклонение по X
-    local found = false
+    local tolerance = 0.5  -- Увеличили допуск для движущихся целей
     
-    print("\n🔍 Поиск Brainrot на X ≈ "..targetX.."...")
-    
-    -- Проверяем все объекты из списка
     for _, brainrotName in ipairs(brainrotList) do
-        local obj = workspace:FindFirstChild(brainrotName, true)  -- Рекурсивный поиск
+        local obj = workspace:FindFirstChild(brainrotName, true)
         
         if obj then
-            -- Получаем позицию (для Model или BasePart)
             local position
             if obj:IsA("Model") then
                 position = obj.PrimaryPart and obj.PrimaryPart.Position or obj:GetPivot().Position
@@ -165,28 +162,15 @@ local function findSpecificBrainrot()
                 position = obj.Position
             end
             
-            -- Проверяем координату X с допуском
             if position and math.abs(position.X - targetX) <= tolerance then
-                print(string.format(
-                    "✅ Найден: %s | Точная позиция: X=%.3f, Y=%.3f, Z=%.3f",
-                    brainrotName,
-                    position.X,
-                    position.Y,
-                    position.Z
-                ))
-                found = true
-                
-                -- Автоматически идем к найденному объекту
-                moveToObject(obj)
-                break
+                print("Начинаем преследование:", brainrotName)
+                followMovingObject(obj)
+                return  -- Начинаем следить за первым найденным
             end
         end
     end
     
-    if not found then
-        print("❌ Brainrot с X ≈ "..targetX.." не найден")
-    end
+    print("Подходящий Brainrot не найден")
 end
 
-
-findSpecificBrainrot()
+findAndFollowBrainrot()
