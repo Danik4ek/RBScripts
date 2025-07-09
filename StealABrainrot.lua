@@ -65,50 +65,57 @@ local brainrotList = {
 }
 
 local function findBrainrotStats(brainrotInstance)
-    -- Ищем GUI в потомках самого Brainrot (BillboardGui)
-    local billboardGui = brainrotInstance:FindFirstChildOfClass("BillboardGui")
-    if billboardGui then
-        for _, guiElement in ipairs(billboardGui:GetDescendants()) do
-            if guiElement:IsA("TextLabel") or guiElement:IsA("TextButton") then
-                -- Поиск цены ($20K)
-                if string.match(guiElement.Text, "^%$[0-9%.]+[KMB]?$") then
-                    print("Найдена цена:", guiElement:GetFullName(), "| Текст:", guiElement.Text)
-                end
-                
-                -- Поиск дохода в секунду ($13/s)
-                if string.match(guiElement.Text, "%$[0-9%.]+/s") then
-                    print("Найден доход:", guiElement:GetFullName(), "| Текст:", guiElement.Text)
-                end
-                
-                -- Поиск редкости (Common/Rare/Epic и т.д.)
-                if guiElement.Text == "Common" or guiElement.Text == "Rare" 
-                   or guiElement.Text == "Epic" or guiElement.Text == "Legendary" or guiElement.Text == "Mythic" or guiElement.Text == "Brainrot God" or guiElement.Text == "Secret" then
-                    print("Найдена редкость:", guiElement:GetFullName(), "| Текст:", guiElement.Text)
-                end
+    print("\n=== Полный анализ объекта: "..brainrotInstance:GetFullName().." ===")
+    
+    -- 1. Выводим всех непосредственных детей объекта
+    print("\nНепосредственные дети объекта:")
+    for _, child in ipairs(brainrotInstance:GetChildren()) do
+        print(child:GetFullName(), "| Тип:", child.ClassName)
+    end
+    
+    -- 2. Рекурсивно выводим всю иерархию объекта
+    local function printHierarchy(obj, indent)
+        indent = indent or 0
+        local prefix = string.rep("  ", indent)
+        print(prefix..obj:GetFullName(), "| Тип:", obj.ClassName)
+        for _, child in ipairs(obj:GetChildren()) do
+            printHierarchy(child, indent + 1)
+        end
+    end
+    
+    print("\nПолная иерархия объекта:")
+    printHierarchy(brainrotInstance)
+    
+    -- 3. Поиск статистики во всех потомках
+    print("\nПоиск статистики во всех потомках:")
+    for _, descendant in ipairs(brainrotInstance:GetDescendants()) do
+        if descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
+            -- Поиск цены ($20K)
+            if string.match(descendant.Text or "", "^%$[0-9%.]+[KMB]?$") then
+                print("НАЙДЕНА ЦЕНА:", descendant:GetFullName(), "| Текст:", descendant.Text)
+            end
+            
+            -- Поиск дохода в секунду ($13/s)
+            if string.match(descendant.Text or "", "%$[0-9%.]+/s") then
+                print("НАЙДЕН ДОХОД:", descendant:GetFullName(), "| Текст:", descendant.Text)
+            end
+            
+            -- Поиск редкости
+            if descendant.Text == "Common" or descendant.Text == "Rare" or 
+               descendant.Text == "Epic" or descendant.Text == "Legendary" or 
+               descendant.Text == "Mythic" or descendant.Text == "Brainrot God" or 
+               descendant.Text == "Secret" then
+                print("НАЙДЕНА РЕДКОСТЬ:", descendant:GetFullName(), "| Текст:", descendant.Text)
+            end
+            
+            -- Выводим все текстовые элементы для отладки
+            if descendant.Text and descendant.Text ~= "" then
+                print("Текстовый элемент:", descendant:GetFullName(), "| Текст:", descendant.Text)
             end
         end
     end
     
-    -- Дополнительно проверяем PlayerGui на случай, если статистика там
-    local playerGui = game:GetService("Players").LocalPlayer.PlayerGui
-    for _, screenGui in ipairs(playerGui:GetChildren()) do
-        if screenGui:IsA("ScreenGui") then
-            for _, guiElement in ipairs(screenGui:GetDescendants()) do
-                if (guiElement:IsA("TextLabel") or guiElement:IsA("TextButton")) 
-                   and string.find(guiElement.Name:lower(), "brainrot") then
-                    -- Анализ текста элемента
-                    if string.match(guiElement.Text, "^%$[0-9%.]+[KMB]?$") then
-                        print("Найдена цена (в PlayerGui):", guiElement:GetFullName(), "| Текст:", guiElement.Text)
-                    elseif string.match(guiElement.Text, "%$[0-9%.]+/s") then
-                        print("Найден доход (в PlayerGui):", guiElement:GetFullName(), "| Текст:", guiElement.Text)
-                    elseif guiElement.Text == "Common" or guiElement.Text == "Rare" 
-                           or guiElement.Text == "Epic" or guiElement.Text == "Legendary" then
-                        print("Найдена редкость (в PlayerGui):", guiElement:GetFullName(), "| Текст:", guiElement.Text)
-                    end
-                end
-            end
-        end
-    end
+    print("=== Анализ завершён ===\n")
 end
 
 -- Интеграция с вашим существующим скриптом
