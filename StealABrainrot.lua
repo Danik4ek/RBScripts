@@ -80,27 +80,6 @@ local function simulateKeyPress(key)
     end
 end
 
-local function printPlayerPosition()
-    local player = Players.LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
-    local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-    
-    -- Создаем подключение к Heartbeat для постоянного вывода
-    local connection
-    connection = RunService.Heartbeat:Connect(function()
-        if humanoidRootPart and humanoidRootPart.Parent then
-            local position = humanoidRootPart.Position
-            print(string.format("Координаты игрока: X=%.2f, Y=%.2f, Z=%.2f", 
-                              position.X, position.Y, position.Z))
-        else
-            -- Если персонаж уничтожен, отключаем
-            connection:Disconnect()
-        end
-    end)
-    
-    return connection  -- Возвращаем соединение, чтобы можно было остановить
-end
-
 local function followMovingObject(target)
     if not target or not target:IsDescendantOf(workspace) then return end
 
@@ -125,6 +104,15 @@ local function followMovingObject(target)
     local lastPosition = targetPart.Position
 
     activeConnections[target] = RunService.Heartbeat:Connect(function(deltaTime)
+        -- Проверяем позицию цели по Z
+        if targetPart.Position.Z >= 255 then
+            print("Цель достигла Z ≥ 255, прекращаем преследование")
+            humanoid:MoveTo(rootPart.Position) -- Останавливаемся
+            activeConnections[target]:Disconnect()
+            activeConnections[target] = nil
+            return
+        end
+
         -- Быстрая проверка расстояния для взаимодействия
         local distance = (targetPart.Position - rootPart.Position).Magnitude
         
@@ -143,7 +131,7 @@ local function followMovingObject(target)
 
         -- Обновляем путь только если:
         -- 1. Прошло >0.5 сек с последнего обновления
-        -- 2. Цель сместилась >5 studs
+        -- 2. Цель сместилась >3 studs
         -- 3. Мы не слишком близко
         if (os.clock() - lastPathUpdate > 0.5) or 
            ((targetPart.Position - lastPosition).Magnitude > 3) then
@@ -166,6 +154,9 @@ local function followMovingObject(target)
                 humanoid:MoveTo(rootPart.Position)
                 
                 for _, waypoint in ipairs(path:GetWaypoints()) do
+                    -- Проверяем позицию цели по Z
+                    if targetPart.Position.Z >= 255 then break end
+                    
                     -- Проверяем актуальность цели
                     if (targetPart.Position - rootPart.Position).Magnitude > 100 then break end
                     
@@ -214,4 +205,3 @@ local function findAndFollowBrainrot()
 end
 
 findAndFollowBrainrot()
-local positionTracker = printPlayerPosition()
