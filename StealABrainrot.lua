@@ -384,6 +384,22 @@ local function findBrainrot()
     end
 end
 
-initialPosition = rootPart.Position
+local function initCharacter()
+    local character = Players.LocalPlayer.Character
+    if character then
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            initialPosition = rootPart.Position
+        end
+    end
+end
+
+-- Подключаем обработчики для инициализации
+Players.LocalPlayer.CharacterAdded:Connect(initCharacter)
+if Players.LocalPlayer.Character then
+    initCharacter()
+end
+
+-- Запускаем основные функции
 findBrainrot()
 collectMoney()
