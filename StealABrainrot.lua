@@ -376,7 +376,7 @@ local function findBrainrot()
                 local position = obj:GetPivot().Position
                 if math.abs(position.X - targetX) <= tolerance and position.Z < 255 then
                     print("Начинаем преследование:", brainrotName)
-                    followMovingObject(obj)
+                    BuyBrainrot(obj)
                     break
                 end
             end
