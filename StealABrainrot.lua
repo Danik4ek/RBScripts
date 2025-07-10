@@ -1,94 +1,62 @@
 local Players = game:GetService("Players")
-local TextService = game:GetService("TextService")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local searchText = "вам нужно"
-local searchTextLower = string.lower(searchText)
+local lastFound = nil
 
--- Безопасное получение текста из любого объекта
-local function getSafeText(obj)
-    local text = nil
-    
-    -- Защищённое получение текста
+-- Улучшенная функция проверки текста
+local function checkForText(obj)
+    -- Проверяем только объекты, которые могут содержать текст
+    if not (obj:IsA("GuiObject") or obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox")) then
+        return false
+    end
+
+    -- Безопасное получение текста
+    local text
     pcall(function()
-        -- Основные текстовые свойства
-        if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-            text = obj.Text
-        elseif obj:IsA("ImageLabel") then
-            text = obj:GetAttribute("AltText") or obj:GetAttribute("Tooltip")
-        end
-        
-        -- Дополнительные источники текста
-        if not text then
-            text = obj:GetAttribute("Text") 
-                 or obj:GetAttribute("Description")
-                 or obj.Name
-        end
+        text = obj.Text or obj:GetAttribute("Text") or obj:GetAttribute("Description") or obj.Name
     end)
-    
-    return text and tostring(text) or nil
+
+    -- Проверка совпадения
+    if text and string.find(string.lower(tostring(text)), string.lower(searchText)) then
+        return true, text
+    end
+
+    return false
 end
 
--- Безопасная проверка совпадения
-local function isTextMatch(obj)
-    local text = getSafeText(obj)
-    if not text then return false end
-    
-    -- Защита от nil после tostring
-    local success, result = pcall(function()
-        return string.find(string.lower(text), searchTextLower)
-    end)
-    
-    return success and result ~= nil
-end
+-- Функция для мониторинга изменений
+local function monitorChanges()
+    while true do
+        -- Проверяем все возможные места
+        local locations = {
+            player.PlayerGui,
+            workspace,
+            game:GetService("StarterGui")
+        }
 
--- Оптимизированный поиск
-local function findText()
-    local targets = {
-        player:WaitForChild("PlayerGui"),
-        workspace,
-        game:GetService("StarterGui")
-    }
-
-    local results = {}
-    
-    for _, target in ipairs(targets) do
-        if target then
-            for _, obj in ipairs(target:GetDescendants()) do
-                if isTextMatch(obj) then
-                    table.insert(results, {
-                        Object = obj,
-                        Path = obj:GetFullName(),
-                        Text = getSafeText(obj)
-                    })
+        for _, location in ipairs(locations) do
+            if location then
+                for _, obj in ipairs(location:GetDescendants()) do
+                    local found, text = checkForText(obj)
+                    if found then
+                        if not lastFound or lastFound.Object ~= obj then
+                            print("Обнаружен изменяемый текст:")
+                            print("Объект:", obj:GetFullName())
+                            print("Текущий текст:", text)
+                            print("Тип:", obj.ClassName)
+                            print("----------------------")
+                            lastFound = {Object = obj, Text = text}
+                        end
+                    end
                 end
             end
         end
-    end
-    
-    return results
-end
 
--- Умный вывод результатов
-local function printResults(results)
-    if #results == 0 then
-        print("🔍 Текст не найден. Проверьте:")
-        print("- Виден ли текст в игре прямо сейчас")
-        print("- Не является ли текст частью изображения")
-        print("- Попробуйте поискать часть текста")
-        return
-    end
-    
-    print("✅ Найдено совпадений: "..#results)
-    for i, item in ipairs(results) do
-        print(string.format("%d. %s (%s)", i, item.Path, item.Object.ClassName))
-        print("   Текст: "..(item.Text or "---"))
+        wait(1) -- Проверка каждую секунду
     end
 end
 
--- Основной цикл с интервалом
-while true do
-    local results = findText()
-    printResults(results)
-    wait(5) -- Интервал между проверками
-end
+-- Запуск мониторинга
+spawn(monitorChanges)
