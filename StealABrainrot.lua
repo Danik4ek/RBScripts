@@ -2,106 +2,98 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-local searchText = "вам нужно" -- Поиск без учета регистра
+local searchText = "вам нужно"
 local lastCheck = 0
 
--- Безопасная функция проверки текста
-local function containsValidText(obj, text)
-    local success, result = pcall(function()
-        text = string.lower(text)
-        
-        -- Игнорируем элементы консоли
-        local coreGui = game:GetService("CoreGui")
-        if coreGui:FindFirstChild("DevConsoleMaster") and obj:IsDescendantOf(coreGui.DevConsoleMaster) then
-            return false
-        end
+-- Расширенная проверка текста
+local function containsTargetText(obj)
+    -- Проверяем все возможные текстовые свойства
+    local textSources = {
+        obj.Text,
+        obj:GetAttribute("Text"),
+        obj:GetAttribute("Description"),
+        obj.Name
+    }
+    
+    -- Игнорируем служебные объекты
+    if obj:IsDescendantOf(game:GetService("CoreGui")) then
+        return false
+    end
 
-        -- Проверяем текстовые объекты
-        if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-            return obj.Text and string.find(string.lower(obj.Text), text) ~= nil
-        end
-
-        -- Проверяем 3D-тексты
-        if obj:IsA("TextLabel") then
-            local parent = obj.Parent
-            if parent and (parent:IsA("BillboardGui") or parent:IsA("SurfaceGui")) then
-                return obj.Text and string.find(string.lower(obj.Text), text) ~= nil
-            end
-        end
-
-        -- Проверяем атрибуты
-        local attrText = obj:GetAttribute("Text") or obj:GetAttribute("Description")
-        if attrText and string.find(string.lower(attrText), text) then
+    -- Проверяем все источники текста
+    for _, text in ipairs(textSources) do
+        if text and string.find(string.lower(text), string.lower(searchText)) then
             return true
         end
-
-        return false
-    end)
+    end
     
-    return success and result or false
+    -- Дополнительные проверки
+    if obj:IsA("ImageLabel") then
+        local altText = obj:GetAttribute("AltText") or obj:GetAttribute("Tooltip")
+        if altText and string.find(string.lower(altText), string.lower(searchText)) then
+            return true
+        end
+    end
+    
+    return false
 end
 
--- Безопасная функция поиска
-local function findTextInGame()
+-- Глубокий поиск с задержкой
+local function deepSearch()
+    local targets = {
+        workspace,
+        player:WaitForChild("PlayerGui"),
+        game:GetService("StarterGui"),
+        game:GetService("CoreGui")
+    }
+    
     local results = {}
     
-    -- Сканируем только важные части игры
-    local scanTargets = {
-        workspace,
-        player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui", 2),
-        game:GetService("StarterGui")
-    }
-
-    for _, target in ipairs(scanTargets) do
-        if target then
-            local success, descendants = pcall(function()
-                return target:GetDescendants()
-            end)
-            
-            if success then
-                for _, obj in ipairs(descendants) do
-                    if containsValidText(obj, searchText) then
-                        table.insert(results, {
-                            Object = obj,
-                            Path = obj:GetFullName(),
-                            Text = obj.Text or obj:GetAttribute("Text")
-                        })
-                    end
-                end
+    for _, target in ipairs(targets) do
+        for _, obj in ipairs(target:GetDescendants()) do
+            if containsTargetText(obj) then
+                table.insert(results, {
+                    Object = obj,
+                    Path = obj:GetFullName(),
+                    Text = obj.Text or obj:GetAttribute("Text") or obj.Name
+                })
             end
         end
     end
-
+    
     return results
 end
 
--- Улучшенный вывод результатов
-local function printResults(results)
+-- Умный вывод результатов
+local function printSmartResults(results)
     if #results == 0 then
-        print("❌ Текст '"..searchText.."' не найден в игровых объектах")
+        print("ℹ️ Попробуйте следующее:")
+        print("1. Убедитесь, что текст не является частью текстуры")
+        print("2. Проверьте регистр (используется поиск: '"..searchText.."')")
+        print("3. Объект может создаваться динамически - подождите 10 секунд")
         return
     end
-
-    print("✅ Найдено "..#results.." объектов с текстом '"..searchText.."':")
+    
+    print("✅ Найдено совпадений: "..#results)
     for i, item in ipairs(results) do
-        print(i..". "..(item.Path or "неизвестный путь"))
+        print(i..". "..item.Path)
+        print("   Тип: "..item.Object.ClassName)
         print("   Текст: "..(item.Text or "---"))
-        print("   Тип: "..(item.Object and item.Object.ClassName or "неизвестный тип"))
     end
 end
 
--- Главный цикл с обработкой ошибок
+-- Главный цикл с повтором
 while true do
-    local success, err = pcall(function()
-        if os.time() - lastCheck >= 3 then
-            printResults(findTextInGame())
-            lastCheck = os.time()
-        end
-    end)
+    local results = deepSearch()
+    printSmartResults(results)
     
-    if not success then
-        warn("Ошибка в главном цикле: "..tostring(err))
+    if #results == 0 then
+        -- Повторная попытка через 5 секунд
+        wait(5)
+        print("\nПовторная проверка...")
+        results = deepSearch()
+        printSmartResults(results)
     end
     
-    wait(1)
+    wait(10) -- Интервал между проверками
 end
