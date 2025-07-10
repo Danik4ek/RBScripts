@@ -252,24 +252,58 @@ local function collectMoney()
     print("Маршрут завершен!")
 end
 
-local function checkForNotifications()
-    local gui = player.PlayerGui
-    for _, screenGui in ipairs(gui:GetChildren()) do
-        if screenGui:IsA("ScreenGui") then
-            for _, element in ipairs(screenGui:GetDescendants()) do
-                if (element:IsA("TextLabel") or element:IsA("TextButton")) and element.Text then
-                    if element.Text:find("Вам нужно") then
-                        print("⚠ Найдено уведомление:", element.Text)
-                        -- Доп. действия (например, закрыть уведомление)
-                        local frame = element:FindFirstAncestorOfClass("Frame")
-                        if frame then frame:Destroy() end
-                        return -- Прерываем после первого найденного
-                    end
-                end
+local function checkElement(element)
+    if not element then return false end
+    
+    -- Проверяем все возможные текстовые свойства
+    local textProperties = {"Text", "RichText", "PlaceholderText", "Message"}
+    for _, prop in ipairs(textProperties) do
+        if element[prop] and type(element[prop]) == "string" and element[prop]:find("Вам нужно") then
+            print("🔍 Найдено совпадение в элементе:", element:GetFullName())
+            print("📝 Текст:", element[prop])
+            return true
+        end
+    end
+    return false
+end
+
+-- Рекурсивный поиск по всем элементам GUI
+local function scanGuiRecursive(guiObject)
+    if not guiObject then return end
+    
+    -- Проверяем текущий элемент
+    checkElement(guiObject)
+    
+    -- Проверяем всех потомков
+    for _, child in ipairs(guiObject:GetChildren()) do
+        scanGuiRecursive(child)
+    end
+end
+
+-- Проверяем все возможные GUI места
+local function fullInterfaceScan()
+    -- 1. Основной PlayerGui
+    local playerGui = player:FindFirstChildOfClass("PlayerGui")
+    if playerGui then scanGuiRecursive(playerGui) end
+    
+    -- 2. 3D-интерфейсы (BillboardGui/SurfaceGui у персонажа)
+    if player.Character then
+        for _, item in ipairs(player.Character:GetDescendants()) do
+            if item:IsA("BillboardGui") or item:IsA("SurfaceGui") then
+                scanGuiRecursive(item)
             end
         end
     end
+    
+    -- 3. CoreGui (для дебага)
+    if RunService:IsStudio() then
+        scanGuiRecursive(game:GetService("CoreGui"))
+    end
 end
+
+-- Оптимизированный поиск с интервалом
+local scanInterval = 1 -- секунд
+local lastScan = 0
 
 local function BuyBrainrot(target)
     if not target or not target:IsDescendantOf(workspace) then 
@@ -446,22 +480,19 @@ if Players.LocalPlayer.Character then
 end
 
 -- Запускаем основные функции
-local connection
-connection = RunService.Heartbeat:Connect(function()
-    -- Проверяем баланс и уведомления не каждый кадр, а с задержкой
-    if math.random(1, 10) == 1 then -- 10% шанс на проверку (оптимизация)
-        local balance = getPlayerBalance()
-        print("Баланс:", balance)
-        
-        checkForNotifications()
+RunService.Heartbeat:Connect(function(deltaTime)
+    lastScan = lastScan + deltaTime
+    if lastScan >= scanInterval then
+        lastScan = 0
+        fullInterfaceScan()
     end
 end)
 
--- Остановка скрипта при перезагрузке (опционально)
-game.DescendantRemoving:Connect(function(obj)
-    if obj == player then
-        connection:Disconnect()
-    end
+-- Дополнительно: мгновенная проверка новых элементов
+player.PlayerGui.DescendantAdded:Connect(function(descendant)
+    checkElement(descendant)
 end)
+
+print("✅ Скрипт поиска текста 'Вам нужно' активирован")
 --findBrainrot()
 --collectMoney()
