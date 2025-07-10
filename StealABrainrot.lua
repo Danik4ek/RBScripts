@@ -101,6 +101,37 @@ local function releaseAllKeys()
     end
 end
 
+local function findDollarElements(gui)
+    -- Проверяем, является ли элемент TextLabel, TextBox или TextButton
+    if gui:IsA("TextLabel") or gui:IsA("TextBox") or gui:IsA("TextButton") then
+        -- Проверяем, содержит ли текст знак доллара
+        if string.find(gui.Text, "$") then
+            print("Найден элемент с $:", gui:GetFullName(), "| Текст:", gui.Text)
+        end
+    end
+    
+    -- Рекурсивно проверяем все дочерние элементы
+    for _, child in ipairs(gui:GetChildren()) do
+        findDollarElements(child)
+    end
+end
+
+-- Функция для поиска элементов с $ во всем PlayerGui
+local function scanAllGuiForDollars()
+    local player = Players.LocalPlayer
+    if not player then return end
+    
+    local playerGui = player:FindFirstChild("PlayerGui")
+    if not playerGui then
+        warn("PlayerGui не найден")
+        return
+    end
+    
+    print("Начинаем поиск элементов с $ в интерфейсе...")
+    findDollarElements(playerGui)
+    print("Поиск завершен")
+end
+
 local function getPlayerBalance()
     -- Получаем путь к элементу (из вашего лога)
     local balanceElement = game:GetService("Players").LocalPlayer.PlayerGui.Main.CoinsShop.Content.Items.Template.Buy.Price
@@ -403,3 +434,4 @@ end
 -- Запускаем основные функции
 findBrainrot()
 collectMoney()
+scanAllGuiForDollars()
