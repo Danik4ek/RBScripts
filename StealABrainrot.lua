@@ -267,7 +267,7 @@ local function findPurchaseMessage()
     end
     
     -- Шаблон для поиска (регулярное выражение)
-    local pattern = "Вам нужно еще %$[%d,]+%.?%d*, чтобы купить это"
+    local pattern = "Вам нужно ещё %$[%d,]+%.?%d*, чтобы купить это"
     
     -- Проверяем все текстовые элементы
     for _, element in ipairs(textElements) do
