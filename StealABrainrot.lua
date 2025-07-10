@@ -5,6 +5,7 @@ local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local activeConnections = {}
 local TextService = game:GetService("TextService")
+local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
 local brainrotList = {
     "Noobini pizzanini",
@@ -251,44 +252,34 @@ local function collectMoney()
     print("Маршрут завершен!")
 end
 
-local function findPurchaseMessage()
-    local player = Players.LocalPlayer
-    if not player then return nil end
-    
-    local playerGui = player:FindFirstChild("PlayerGui")
-    if not playerGui then return nil end
-    
-    -- Более гибкий поиск без учета регистра и точного совпадения
-    for _, guiElement in ipairs(playerGui:GetDescendants()) do
-        if (guiElement:IsA("TextLabel") or guiElement:IsA("TextBox") or guiElement:IsA("TextButton")) then
-            local text = string.lower(guiElement.Text)
-            if string.find(text, "вам нужно") then
-                return guiElement  -- Возвращаем первый подходящий элемент
-            end
+local function searchTextInGui(guiObject)
+    -- Проверяем, есть ли свойство Text у объекта
+    if guiObject:IsA("TextLabel") or guiObject:IsA("TextButton") or guiObject:IsA("TextBox") then
+        if string.find(guiObject.Text, "Вам нужно") then
+            print("Найден текст 'Вам нужно' в:", guiObject:GetFullName())
+            -- Здесь можно добавить дополнительные действия
         end
     end
     
-    return nil
+    -- Рекурсивно проверяем дочерние элементы
+    for _, child in ipairs(guiObject:GetChildren()) do
+        searchTextInGui(child)
+    end
 end
 
-local function monitorPurchaseMessage()
-    local lastFound = false
-    
+local function checkPlayerGui()
     while true do
-        local messageElement = findPurchaseMessage()
-        
-        if messageElement and not lastFound then
-            print("[Обнаружено] Сообщение:", messageElement.Text)
-            print("│── В элементе:", messageElement:GetFullName())
-            lastFound = true
-        elseif not messageElement and lastFound then
-            print("[Исчезло] Сообщение больше не отображается")
-            lastFound = false
+        local playerGui = player:FindFirstChildOfClass("PlayerGui")
+        if playerGui then
+            -- Проверяем все экраны в PlayerGui
+            for _, gui in ipairs(playerGui:GetChildren()) do
+                searchTextInGui(gui)
+            end
         end
-        
-        task.wait(0.3)  -- Проверка каждые 0.3 секунды
+        wait(1) -- Проверяем каждую секунду
     end
 end
+
 local function BuyBrainrot(target)
     if not target or not target:IsDescendantOf(workspace) then 
         releaseAllKeys()
@@ -464,6 +455,6 @@ if Players.LocalPlayer.Character then
 end
 
 -- Запускаем основные функции
-task.spawn(monitorPurchaseMessage)
+checkPlayerGui()
 --findBrainrot()
 --collectMoney()
