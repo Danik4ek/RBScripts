@@ -432,6 +432,6 @@ if Players.LocalPlayer.Character then
 end
 
 -- Запускаем основные функции
+scanAllGuiForDollars()
 findBrainrot()
 collectMoney()
-scanAllGuiForDollars()
