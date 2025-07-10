@@ -5,58 +5,67 @@ local player = Players.LocalPlayer
 local searchText = "вам нужно"
 local lastCheck = 0
 
--- Расширенная проверка текста
+-- Безопасная проверка текста с защитой от ошибок
 local function containsTargetText(obj)
-    -- Проверяем все возможные текстовые свойства
-    local textSources = {
-        obj.Text,
-        obj:GetAttribute("Text"),
-        obj:GetAttribute("Description"),
-        obj.Name
-    }
-    
-    -- Игнорируем служебные объекты
-    if obj:IsDescendantOf(game:GetService("CoreGui")) then
+    -- Пропускаем нерелевантные объекты
+    if not obj:IsA("GuiObject") 
+       and not obj:IsA("TextLabel") 
+       and not obj:IsA("TextButton") 
+       and not obj:IsA("TextBox") 
+       and not obj:IsA("ImageLabel") then
         return false
     end
 
-    -- Проверяем все источники текста
-    for _, text in ipairs(textSources) do
-        if text and string.find(string.lower(text), string.lower(searchText)) then
-            return true
-        end
+    -- Безопасная проверка свойств
+    local function safeGetText(target)
+        local text = nil
+        pcall(function()
+            -- Проверяем основные свойства
+            if target:IsA("GuiObject") then
+                text = target.Text
+            end
+            -- Проверяем атрибуты
+            if not text then
+                text = target:GetAttribute("Text") 
+                     or target:GetAttribute("Description")
+                     or target:GetAttribute("Tooltip")
+            end
+            -- Проверяем имя
+            if not text then
+                text = target.Name
+            end
+        end)
+        return text
     end
-    
-    -- Дополнительные проверки
-    if obj:IsA("ImageLabel") then
-        local altText = obj:GetAttribute("AltText") or obj:GetAttribute("Tooltip")
-        if altText and string.find(string.lower(altText), string.lower(searchText)) then
-            return true
-        end
+
+    local text = safeGetText(obj)
+    if text and string.find(string.lower(text), string.lower(searchText)) then
+        return true
     end
-    
+
     return false
 end
 
--- Глубокий поиск с задержкой
+-- Оптимизированный поиск
 local function deepSearch()
     local targets = {
-        workspace,
         player:WaitForChild("PlayerGui"),
-        game:GetService("StarterGui"),
-        game:GetService("CoreGui")
+        workspace:FindFirstChildOfClass("SurfaceGui") and workspace,
+        game:GetService("StarterGui")
     }
-    
+
     local results = {}
     
     for _, target in ipairs(targets) do
-        for _, obj in ipairs(target:GetDescendants()) do
-            if containsTargetText(obj) then
-                table.insert(results, {
-                    Object = obj,
-                    Path = obj:GetFullName(),
-                    Text = obj.Text or obj:GetAttribute("Text") or obj.Name
-                })
+        if target then
+            for _, obj in ipairs(target:GetDescendants()) do
+                if containsTargetText(obj) then
+                    table.insert(results, {
+                        Object = obj,
+                        Path = obj:GetFullName(),
+                        Text = safeGetText(obj)
+                    })
+                end
             end
         end
     end
@@ -64,17 +73,17 @@ local function deepSearch()
     return results
 end
 
--- Умный вывод результатов
-local function printSmartResults(results)
+-- Улучшенный вывод
+local function printResults(results)
     if #results == 0 then
-        print("ℹ️ Попробуйте следующее:")
-        print("1. Убедитесь, что текст не является частью текстуры")
-        print("2. Проверьте регистр (используется поиск: '"..searchText.."')")
-        print("3. Объект может создаваться динамически - подождите 10 секунд")
+        print("🔍 Текст не найден. Возможные причины:")
+        print("- Текст является частью изображения")
+        print("- Объект создаётся динамически (попробуйте подождать)")
+        print("- Проверьте регистр: ищем '"..searchText.."'")
         return
     end
     
-    print("✅ Найдено совпадений: "..#results)
+    print("✅ Найдено объектов: "..#results)
     for i, item in ipairs(results) do
         print(i..". "..item.Path)
         print("   Тип: "..item.Object.ClassName)
@@ -82,18 +91,9 @@ local function printSmartResults(results)
     end
 end
 
--- Главный цикл с повтором
+-- Главный цикл
 while true do
     local results = deepSearch()
-    printSmartResults(results)
-    
-    if #results == 0 then
-        -- Повторная попытка через 5 секунд
-        wait(5)
-        print("\nПовторная проверка...")
-        results = deepSearch()
-        printSmartResults(results)
-    end
-    
-    wait(10) -- Интервал между проверками
+    printResults(results)
+    wait(5) -- Интервал между проверками
 end
