@@ -253,55 +253,42 @@ end
 
 local function findPurchaseMessage()
     local player = Players.LocalPlayer
-    if not player then 
-        print("Игрок не найден")
-        return nil 
-    end
+    if not player then return nil end
     
     local playerGui = player:FindFirstChild("PlayerGui")
-    if not playerGui then 
-        print("PlayerGui не найден")
-        return nil 
-    end
+    if not playerGui then return nil end
     
-    print("Поиск сообщения в GUI...")
+    -- Более гибкий поиск без учета регистра и точного совпадения
     for _, guiElement in ipairs(playerGui:GetDescendants()) do
-        if guiElement:IsA("TextLabel") or guiElement:IsA("TextBox") or guiElement:IsA("TextButton") then
-            print("Проверяем элемент:", guiElement:GetFullName())
-            if string.find(guiElement.Text:lower(), "вам нужно") then
-                print("Найдено совпадение:", guiElement.Text)
-                return guiElement
+        if (guiElement:IsA("TextLabel") or guiElement:IsA("TextBox") or guiElement:IsA("TextButton")) then
+            local text = string.lower(guiElement.Text)
+            if string.find(text, "вам нужно") then
+                return guiElement  -- Возвращаем первый подходящий элемент
             end
         end
     end
     
-    print("Сообщение не найдено")
     return nil
 end
 
-
 local function monitorPurchaseMessage()
-    local lastState = false  -- Запоминаем предыдущее состояние
+    local lastFound = false
     
     while true do
         local messageElement = findPurchaseMessage()
-        local currentState = messageElement ~= nil
         
-        -- Сообщаем только при изменении состояния
-        if currentState ~= lastState then
-            if currentState then
-                print("Сообщение 'Вам нужно ещё' появилось")
-                print("Элемент:", messageElement:GetFullName())
-            else
-                print("Сообщение 'Вам нужно ещё' исчезло")
-            end
-            lastState = currentState
+        if messageElement and not lastFound then
+            print("[Обнаружено] Сообщение:", messageElement.Text)
+            print("│── В элементе:", messageElement:GetFullName())
+            lastFound = true
+        elseif not messageElement and lastFound then
+            print("[Исчезло] Сообщение больше не отображается")
+            lastFound = false
         end
         
-        task.wait(0.5)  -- Проверяем чаще (каждые 0.5 секунд)
+        task.wait(0.3)  -- Проверка каждые 0.3 секунды
     end
 end
-
 local function BuyBrainrot(target)
     if not target or not target:IsDescendantOf(workspace) then 
         releaseAllKeys()
