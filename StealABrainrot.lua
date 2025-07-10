@@ -1,35 +1,57 @@
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
-
--- Оптимизированная функция проверки
-local function checkForText()
-    local playerGui = player:FindFirstChildOfClass("PlayerGui")
-    if not playerGui then return end
+-- Функция для получения всех объектов PlayerGui
+function getAllPlayerGuiElements(player)
+    -- Проверяем, существует ли игрок и его PlayerGui
+    if not player or not player:FindFirstChild("PlayerGui") then
+        warn("PlayerGui не найден для игрока " .. tostring(player))
+        return {}
+    end
     
-    -- Ищем только в активных ScreenGui
-    for _, screenGui in ipairs(playerGui:GetChildren()) do
-        if screenGui:IsA("ScreenGui") and screenGui.Enabled then
-            -- Проверяем текстовые элементы
-            for _, element in ipairs(screenGui:GetDescendants()) do
-                if element:IsA("TextLabel") or element:IsA("TextButton") then
-                    if element.Text and element.Text:find("Вам нужно") then
-                        print("Найдено уведомление в:", element:GetFullName())
-                        -- Дополнительные действия (например, закрыть уведомление)
-                        local frame = element:FindFirstAncestorWhichIsA("Frame")
-                        if frame then
-                            frame.Visible = false
-                        end
-                    end
-                end
-                -- Микро-пауза для снижения нагрузки
-                task.wait()
+    local guiElements = {}
+    local playerGui = player:WaitForChild("PlayerGui")
+    
+    -- Рекурсивная функция для сбора всех GUI-объектов
+    local function scanGuiObjects(gui, path)
+        path = path or ""
+        for _, child in ipairs(gui:GetChildren()) do
+            local newPath = path .. "/" .. child.Name
+            table.insert(guiElements, {
+                Object = child,
+                Path = newPath,
+                ClassName = child.ClassName,
+                FullName = player.Name .. ".PlayerGui" .. newPath
+            })
+            
+            -- Если объект является контейнером, сканируем его содержимое
+            if child:IsA("GuiObject") or child:IsA("LayerCollector") then
+                scanGuiObjects(child, newPath)
             end
         end
     end
+    
+    -- Сканируем каждый ScreenGui и StarterGui
+    for _, screenGui in ipairs(playerGui:GetChildren()) do
+        scanGuiObjects(screenGui)
+    end
+    
+    return guiElements
 end
 
--- Проверка с интервалом 5 секунд
-while true do
-    checkForText()
-    wait(5) -- Интервал можно уменьшить до 1-2 секунд при необходимости
+-- Пример использования для локального игрока
+local player = game:GetService("Players").LocalPlayer
+
+-- Подождем, пока PlayerGui загрузится
+player:WaitForChild("PlayerGui")
+
+-- Получаем все элементы GUI
+local allGuiElements = getAllPlayerGuiElements(player)
+
+-- Выводим информацию в output
+print("=== Все элементы интерфейса игрока ===")
+print("Всего элементов: " .. #allGuiElements)
+
+for i, element in ipairs(allGuiElements) do
+    print(string.format("%d. %s (%s)", i, element.FullName, element.ClassName))
 end
+
+-- Альтернативный вариант: возвращаем таблицу с элементами
+return allGuiElements
