@@ -259,46 +259,35 @@ local function findPurchaseMessage()
     if not playerGui then return nil end
     
     -- Ищем все текстовые элементы в интерфейсе
-    local textElements = {}
     for _, guiElement in ipairs(playerGui:GetDescendants()) do
-        if guiElement:IsA("TextLabel") or guiElement:IsA("TextBox") or guiElement:IsA("TextButton") then
-            table.insert(textElements, guiElement)
-        end
-    end
-    
-    -- Шаблон для поиска (регулярное выражение)
-    local pattern = "Вам нужно ещё %$[%d,]+%.?%d*, чтобы купить это"
-    
-    -- Проверяем все текстовые элементы
-    for _, element in ipairs(textElements) do
-        if string.find(element.Text, pattern) then
-            return element
+        if (guiElement:IsA("TextLabel") or guiElement:IsA("TextBox") or guiElement:IsA("TextButton")) 
+           and string.find(guiElement.Text, "Вам нужно ещё") then
+            return guiElement
         end
     end
     
     return nil
 end
 
--- Функция для мониторинга сообщения
 local function monitorPurchaseMessage()
+    local lastState = false  -- Запоминаем предыдущее состояние
+    
     while true do
         local messageElement = findPurchaseMessage()
-        if messageElement then
-            print("Найдено сообщение о недостаточной сумме:")
-            print("Элемент:", messageElement:GetFullName())
-            print("Текст:", messageElement.Text)
-            
-            -- Извлекаем сумму из сообщения
-            local amount = string.match(messageElement.Text, "Вам нужно еще %$(%d+), чтобы купить это")
-            if amount then
-                amount = tonumber(amount:gsub(",", ""))
-                print("Необходимая сумма:", amount)
+        local currentState = messageElement ~= nil
+        
+        -- Сообщаем только при изменении состояния
+        if currentState ~= lastState then
+            if currentState then
+                print("Сообщение 'Вам нужно ещё' появилось")
+                print("Элемент:", messageElement:GetFullName())
+            else
+                print("Сообщение 'Вам нужно ещё' исчезло")
             end
-        else
-            print("Сообщение не найдено")
+            lastState = currentState
         end
         
-        task.wait(1) -- Проверка каждую секунду
+        task.wait(0.5)  -- Проверяем чаще (каждые 0.5 секунд)
     end
 end
 
