@@ -101,75 +101,47 @@ local function releaseAllKeys()
     end
 end
 
-local function findStrictDollarElements(gui, results)
-    results = results or {}
-    
-    -- Проверяем только текстовые элементы
-    if gui:IsA("TextLabel") or gui:IsA("TextBox") or gui:IsA("TextButton") then
-        local text = gui.Text
-        
-        -- Проверяем строгое соответствие шаблону: $ и цифры, ничего больше
-        if string.match(text, "^%$%d+$") then
-            table.insert(results, {
-                Instance = gui,
-                Path = gui:GetFullName(),
-                Text = text,
-                Value = tonumber(text:sub(2)) -- Убираем $ и преобразуем в число
-            })
-        end
-    end
-    
-    -- Рекурсивно проверяем дочерние элементы
-    for _, child in ipairs(gui:GetChildren()) do
-        findStrictDollarElements(child, results)
-    end
-    
-    return results
-end
-
-local function scanForExactDollarValues()
-    local player = Players.LocalPlayer
-    if not player then return {} end
-    
-    local playerGui = player:FindFirstChild("PlayerGui")
-    if not playerGui then
-        warn("PlayerGui не найден")
-        return {}
-    end
-    
-    print("Поиск элементов с строгим форматом $числа...")
-    local dollarElements = findStrictDollarElements(playerGui)
-    
-    if #dollarElements > 0 then
-        print(string.format("\nНайдено %d элементов:", #dollarElements))
-        for i, item in ipairs(dollarElements) do
-            print(string.format("%d. %s = %s (число: %d)", 
-                  i, item.Path, item.Text, item.Value))
-        end
-    else
-        print("Элементы с форматом $числа не найдены")
-    end
-    
-    return dollarElements
-end
-
 local function getPlayerBalance()
-    -- Получаем путь к элементу (из вашего лога)
-    local balanceElement = game:GetService("Players").LocalPlayer.PlayerGui.Main.CoinsShop.Content.Items.Template.Buy.Price
-    
+    -- Получаем путь к элементу из вашего лога
+    local balanceElement = game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("Main", true)
+    if balanceElement then
+        balanceElement = balanceElement:FindFirstChild("LeftBottom", true)
+        if balanceElement then
+            balanceElement = balanceElement:FindFirstChild("Currency", true)
+        end
+    end
+
+    -- Альтернативный вариант для надежности (если структура может меняться)
+    if not balanceElement then
+        balanceElement = game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("Currency", true)
+    end
+
     if balanceElement and balanceElement:IsA("TextLabel") then
-        -- Извлекаем число из текста (удаляем "$" и преобразуем в число)
+        -- Извлекаем число из текста (формат "$195")
         local balanceText = balanceElement.Text
+        -- Удаляем "$" и преобразуем в число
         local balanceNumber = tonumber(balanceText:match("%$(%d+)"))
         
         if balanceNumber then
             return balanceNumber
         else
-            warn("Не удалось преобразовать баланс в число:", balanceText)
-            return 0
+            -- Пробуем альтернативные форматы, если основной не сработал
+            balanceNumber = tonumber(balanceText:match("%d+")) -- Просто цифры
+            if balanceNumber then
+                return balanceNumber
+            else
+                warn("Не удалось преобразовать баланс в число. Текст:", balanceText)
+                return 0
+            end
         end
     else
         warn("Элемент баланса не найден или не является TextLabel")
+        -- Выводим отладочную информацию
+        local gui = game:GetService("Players").LocalPlayer.PlayerGui
+        print("Структура PlayerGui:")
+        for _, child in ipairs(gui:GetChildren()) do
+            print(child.Name)
+        end
         return 0
     end
 end
@@ -453,12 +425,5 @@ if Players.LocalPlayer.Character then
 end
 
 -- Запускаем основные функции
-local exactDollarElements = scanForExactDollarValues() or {}  -- Если nil, то пустая таблица
-if #exactDollarElements > 0 then
-    local balanceElement = exactDollarElements[1].Instance
-    print("Баланс:", balanceElement.Text)
-else
-    warn("Элементы с $ не найдены!")
-end
---findBrainrot()
---collectMoney()
+findBrainrot()
+collectMoney()
