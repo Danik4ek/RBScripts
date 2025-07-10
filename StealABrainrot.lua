@@ -4,6 +4,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local activeConnections = {}
+local TextService = game:GetService("TextService")
 
 local brainrotList = {
     "Noobini pizzanini",
@@ -250,6 +251,57 @@ local function collectMoney()
     print("Маршрут завершен!")
 end
 
+local function findPurchaseMessage()
+    local player = Players.LocalPlayer
+    if not player then return nil end
+    
+    local playerGui = player:FindFirstChild("PlayerGui")
+    if not playerGui then return nil end
+    
+    -- Ищем все текстовые элементы в интерфейсе
+    local textElements = {}
+    for _, guiElement in ipairs(playerGui:GetDescendants()) do
+        if guiElement:IsA("TextLabel") or guiElement:IsA("TextBox") or guiElement:IsA("TextButton") then
+            table.insert(textElements, guiElement)
+        end
+    end
+    
+    -- Шаблон для поиска (регулярное выражение)
+    local pattern = "Вам нужно еще %$[%d,]+%.?%d*, чтобы купить это"
+    
+    -- Проверяем все текстовые элементы
+    for _, element in ipairs(textElements) do
+        if string.find(element.Text, pattern) then
+            return element
+        end
+    end
+    
+    return nil
+end
+
+-- Функция для мониторинга сообщения
+local function monitorPurchaseMessage()
+    while true do
+        local messageElement = findPurchaseMessage()
+        if messageElement then
+            print("Найдено сообщение о недостаточной сумме:")
+            print("Элемент:", messageElement:GetFullName())
+            print("Текст:", messageElement.Text)
+            
+            -- Извлекаем сумму из сообщения
+            local amount = string.match(messageElement.Text, "Вам нужно еще %$(%d+), чтобы купить это")
+            if amount then
+                amount = tonumber(amount:gsub(",", ""))
+                print("Необходимая сумма:", amount)
+            end
+        else
+            print("Сообщение не найдено")
+        end
+        
+        task.wait(1) -- Проверка каждую секунду
+    end
+end
+
 local function BuyBrainrot(target)
     if not target or not target:IsDescendantOf(workspace) then 
         releaseAllKeys()
@@ -425,5 +477,6 @@ if Players.LocalPlayer.Character then
 end
 
 -- Запускаем основные функции
-findBrainrot()
-collectMoney()
+task.spawn(monitorPurchaseMessage)
+--findBrainrot()
+--collectMoney()
