@@ -1,84 +1,84 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local StarterGui = game:GetService("StarterGui")
 
 local player = Players.LocalPlayer
 local searchText = "вам нужно" -- Поиск без учета регистра
-local debounce = false -- Защита от спама
+local lastCheck = 0
 
--- Функция для проверки текста в любом объекте
-local function containsText(obj, text)
+-- Функция для проверки текста в объекте (без DevConsole)
+local function containsValidText(obj, text)
     text = string.lower(text)
     
-    -- 1. Проверка стандартных текстовых свойств
+    -- Игнорируем элементы консоли
+    if obj:IsDescendantOf(game:GetService("CoreGui").DevConsoleMaster) then
+        return false
+    end
+
+    -- Проверяем только нужные типы объектов
     if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
         return obj.Text and string.find(string.lower(obj.Text), text)
     end
 
-    -- 2. Проверка атрибутов
+    -- Проверяем 3D-тексты
+    if obj:IsA("TextLabel") and (obj.Parent:IsA("BillboardGui") or obj.Parent:IsA("SurfaceGui")) then
+        return obj.Text and string.find(string.lower(obj.Text), text)
+    end
+
+    -- Проверяем атрибуты
     local attrText = obj:GetAttribute("Text") or obj:GetAttribute("Description")
     if attrText and string.find(string.lower(attrText), text) then
         return true
     end
 
-    -- 3. Проверка других свойств (например, звуков, инструментов)
-    if obj:IsA("Sound") and obj.Name ~= "Sound" then
-        return string.find(string.lower(obj.Name), text)
-    end
-
-    -- 4. Проверка 3D-текстов (BillboardGui, SurfaceGui)
-    if obj:IsA("TextLabel") and (obj.Parent:IsA("BillboardGui") or obj.Parent:IsA("SurfaceGui")) then
-        return obj.Text and string.find(string.lower(obj.Text), text)
-    end
-
-    -- 5. Проверка в скриптах (если нужно)
-    -- if obj:IsA("Script") or obj:IsA("LocalScript") then
-    --     local source = obj.Source
-    --     return source and string.find(string.lower(source), text)
-    -- end
-
     return false
 end
 
--- Рекурсивный поиск по всем объектам
-local function scanAllObjects(parent, results)
-    for _, child in ipairs(parent:GetChildren()) do
-        if containsText(child, searchText) then
-            table.insert(results, {
-                Object = child,
-                Path = child:GetFullName(),
-                Text = child.Text or child:GetAttribute("Text") or child.Name
-            })
-        end
-        scanAllObjects(child, results) -- Рекурсивно проверяем детей
-    end
-end
-
 -- Основная функция поиска
-local function findAllTextMatches()
-    if debounce then return end
-    debounce = true
-    
+local function findTextInGame()
     local results = {}
-    scanAllObjects(game, results) -- Начинаем с корня игры
     
-    -- Вывод результатов
-    if #results > 0 then
-        print("🔍 Найдено объектов с текстом '"..searchText.."': "..#results)
-        for i, item in ipairs(results) do
-            print(i..". "..item.Path)
-            print("   Текст: "..tostring(item.Text))
+    -- Сканируем только важные части игры
+    local scanTargets = {
+        workspace,
+        player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui"),
+        game:GetService("StarterGui")
+    }
+
+    for _, target in ipairs(scanTargets) do
+        for _, obj in ipairs(target:GetDescendants()) do
+            if containsValidText(obj, searchText) then
+                table.insert(results, {
+                    Object = obj,
+                    Path = obj:GetFullName(),
+                    Text = obj.Text or obj:GetAttribute("Text")
+                })
+            end
         end
-    else
-        print("❌ Текст '"..searchText.."' не найден ни в одном объекте.")
     end
-    
-    debounce = false
+
     return results
 end
 
--- Автоматический поиск каждые 5 секунд
+-- Улучшенный вывод результатов
+local function printResults(results)
+    if #results == 0 then
+        print("❌ Текст '"..searchText.."' не найден в игровых объектах")
+        return
+    end
+
+    print("✅ Найдено "..#results.." объектов с текстом '"..searchText.."':")
+    for i, item in ipairs(results) do
+        print(i..". "..item.Path)
+        print("   Текст: "..(item.Text or "---"))
+        print("   Тип: "..item.Object.ClassName)
+    end
+end
+
+-- Проверка каждые 3 секунды
 while true do
-    findAllTextMatches()
-    wait(1) -- Интервал проверки
+    if os.time() - lastCheck >= 3 then
+        printResults(findTextInGame())
+        lastCheck = os.time()
+    end
+    wait(0.1)
 end
