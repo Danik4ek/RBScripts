@@ -455,6 +455,6 @@ if Players.LocalPlayer.Character then
 end
 
 -- Запускаем основные функции
-checkPlayerGui()
+task.spawn(checkPlayerGui())
 --findBrainrot()
 --collectMoney()
