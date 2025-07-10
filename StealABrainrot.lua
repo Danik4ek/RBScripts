@@ -256,15 +256,14 @@ local function checkForNotifications()
     local gui = player.PlayerGui
     for _, screenGui in ipairs(gui:GetChildren()) do
         if screenGui:IsA("ScreenGui") then
-            -- Ищем TextLabel, TextButton, TextBox с нужным текстом
             for _, element in ipairs(screenGui:GetDescendants()) do
-                if (element:IsA("TextLabel") or element:IsA("TextButton") or element:IsA("TextBox")) then
-                    if string.find(element.Text or "", "Вам нужно") then
+                if (element:IsA("TextLabel") or element:IsA("TextButton")) and element.Text then
+                    if element.Text:find("Вам нужно") then
                         print("⚠ Найдено уведомление:", element.Text)
-                        -- Можно добавить реакцию (например, закрыть уведомление)
-                        if element:FindFirstAncestorOfClass("Frame") then
-                            element:FindFirstAncestorOfClass("Frame"):Destroy()
-                        end
+                        -- Доп. действия (например, закрыть уведомление)
+                        local frame = element:FindFirstAncestorOfClass("Frame")
+                        if frame then frame:Destroy() end
+                        return -- Прерываем после первого найденного
                     end
                 end
             end
@@ -447,8 +446,22 @@ if Players.LocalPlayer.Character then
 end
 
 -- Запускаем основные функции
-while true do
-    checkForNotifications()
-end
+local connection
+connection = RunService.Heartbeat:Connect(function()
+    -- Проверяем баланс и уведомления не каждый кадр, а с задержкой
+    if math.random(1, 10) == 1 then -- 10% шанс на проверку (оптимизация)
+        local balance = getPlayerBalance()
+        print("Баланс:", balance)
+        
+        checkForNotifications()
+    end
+end)
+
+-- Остановка скрипта при перезагрузке (опционально)
+game.DescendantRemoving:Connect(function(obj)
+    if obj == player then
+        connection:Disconnect()
+    end
+end)
 --findBrainrot()
 --collectMoney()
