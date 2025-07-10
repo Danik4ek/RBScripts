@@ -226,7 +226,7 @@ local function collectMoney()
     print("Маршрут завершен!")
 end
 
-local function followMovingObject(target)
+local function BuyBrainrot(target)
     if not target or not target:IsDescendantOf(workspace) then 
         releaseAllKeys()
         currentlyFollowing = nil
@@ -253,13 +253,35 @@ local function followMovingObject(target)
         return 
     end
 
+    -- Получаем начальный баланс
+    local initialBalance = getPlayerBalance()
+    print("Начальный баланс:", initialBalance)
+    
     currentlyFollowing = target
     local lastPathUpdate = 0
     local lastPosition = targetPart.Position
+    local lastBalanceCheck = os.clock()
     local shouldContinue = true
 
     activeConnections[target] = RunService.Heartbeat:Connect(function()
         if not shouldContinue then return end
+        
+        -- Проверяем баланс каждые 0.5 секунд
+        if os.clock() - lastBalanceCheck > 0.5 then
+            local currentBalance = getPlayerBalance()
+            lastBalanceCheck = os.clock()
+            
+            if currentBalance < initialBalance then
+                print("Баланс уменьшился! Покупка совершена. Прекращаем преследование.")
+                humanoid:MoveTo(rootPart.Position)
+                releaseAllKeys()
+                activeConnections[target]:Disconnect()
+                activeConnections[target] = nil
+                currentlyFollowing = nil
+                shouldContinue = false
+                return
+            end
+        end
         
         if targetPart.Position.Z >= 255 then
             print("Цель достигла Z ≥ 255, прекращаем преследование")
@@ -331,7 +353,7 @@ local function followMovingObject(target)
     end)
 end
 
-local function findAndFollowBrainrot()
+local function findBrainrot()
     local targetX = -410.7
     local tolerance = 2.0
     
@@ -349,7 +371,7 @@ local function findAndFollowBrainrot()
         end
 
         for _, brainrotName in ipairs(brainrotList) do
-            local obj = workspace:FindFirstChild(brainrotName, true)
+            local obj = workspace:FindFirstChild("Noobini pizzanini", true)
             if obj and obj ~= currentlyFollowing then
                 local position = obj:GetPivot().Position
                 if math.abs(position.X - targetX) <= tolerance and position.Z < 255 then
@@ -375,5 +397,6 @@ end
 Players.LocalPlayer.CharacterAdded:Connect(initCharacter)
 if Players.LocalPlayer.Character then
     initCharacter()
+    findBrainrot()
     collectMoney()
 end
