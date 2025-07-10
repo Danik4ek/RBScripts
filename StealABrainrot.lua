@@ -453,9 +453,12 @@ if Players.LocalPlayer.Character then
 end
 
 -- Запускаем основные функции
+local exactDollarElements = scanForExactDollarValues() or {}  -- Если nil, то пустая таблица
 if #exactDollarElements > 0 then
     local balanceElement = exactDollarElements[1].Instance
-    print("Основной элемент баланса:", balanceElement:GetFullName())
+    print("Баланс:", balanceElement.Text)
+else
+    warn("Элементы с $ не найдены!")
 end
 --findBrainrot()
 --collectMoney()
