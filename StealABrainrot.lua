@@ -371,7 +371,7 @@ local function findBrainrot()
         end
 
         for _, brainrotName in ipairs(brainrotList) do
-            local obj = workspace:FindFirstChild("Noobini pizzanini", true)
+            local obj = workspace:FindFirstChild(brainrotName, true)
             if obj and obj ~= currentlyFollowing then
                 local position = obj:GetPivot().Position
                 if math.abs(position.X - targetX) <= tolerance and position.Z < 255 then
