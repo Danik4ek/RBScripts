@@ -252,31 +252,23 @@ local function collectMoney()
     print("Маршрут завершен!")
 end
 
-local function searchTextInGui(guiObject)
-    -- Проверяем, есть ли свойство Text у объекта
-    if guiObject:IsA("TextLabel") or guiObject:IsA("TextButton") or guiObject:IsA("TextBox") then
-        if string.find(guiObject.Text, "Вам нужно") then
-            print("Найден текст 'Вам нужно' в:", guiObject:GetFullName())
-            -- Здесь можно добавить дополнительные действия
-        end
-    end
-    
-    -- Рекурсивно проверяем дочерние элементы
-    for _, child in ipairs(guiObject:GetChildren()) do
-        searchTextInGui(child)
-    end
-end
-
-local function checkPlayerGui()
-    while true do
-        local playerGui = player:FindFirstChildOfClass("PlayerGui")
-        if playerGui then
-            -- Проверяем все экраны в PlayerGui
-            for _, gui in ipairs(playerGui:GetChildren()) do
-                searchTextInGui(gui)
+local function checkForNotifications()
+    local gui = player.PlayerGui
+    for _, screenGui in ipairs(gui:GetChildren()) do
+        if screenGui:IsA("ScreenGui") then
+            -- Ищем TextLabel, TextButton, TextBox с нужным текстом
+            for _, element in ipairs(screenGui:GetDescendants()) do
+                if (element:IsA("TextLabel") or element:IsA("TextButton") or element:IsA("TextBox")) then
+                    if string.find(element.Text or "", "Вам нужно") then
+                        print("⚠ Найдено уведомление:", element.Text)
+                        -- Можно добавить реакцию (например, закрыть уведомление)
+                        if element:FindFirstAncestorOfClass("Frame") then
+                            element:FindFirstAncestorOfClass("Frame"):Destroy()
+                        end
+                    end
+                end
             end
         end
-        wait(1) -- Проверяем каждую секунду
     end
 end
 
@@ -455,6 +447,8 @@ if Players.LocalPlayer.Character then
 end
 
 -- Запускаем основные функции
-task.spawn(checkPlayerGui())
+while true do
+    checkForNotifications()
+end
 --findBrainrot()
 --collectMoney()
