@@ -253,21 +253,32 @@ end
 
 local function findPurchaseMessage()
     local player = Players.LocalPlayer
-    if not player then return nil end
+    if not player then 
+        print("Игрок не найден")
+        return nil 
+    end
     
     local playerGui = player:FindFirstChild("PlayerGui")
-    if not playerGui then return nil end
+    if not playerGui then 
+        print("PlayerGui не найден")
+        return nil 
+    end
     
-    -- Ищем все текстовые элементы в интерфейсе
+    print("Поиск сообщения в GUI...")
     for _, guiElement in ipairs(playerGui:GetDescendants()) do
-        if (guiElement:IsA("TextLabel") or guiElement:IsA("TextBox") or guiElement:IsA("TextButton")) 
-           and string.find(guiElement.Text, "Вам нужно ещё") then
-            return guiElement
+        if guiElement:IsA("TextLabel") or guiElement:IsA("TextBox") or guiElement:IsA("TextButton") then
+            print("Проверяем элемент:", guiElement:GetFullName())
+            if string.find(guiElement.Text:lower(), "вам нужно") then
+                print("Найдено совпадение:", guiElement.Text)
+                return guiElement
+            end
         end
     end
     
+    print("Сообщение не найдено")
     return nil
 end
+
 
 local function monitorPurchaseMessage()
     local lastState = false  -- Запоминаем предыдущее состояние
