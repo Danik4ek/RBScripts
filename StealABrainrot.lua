@@ -101,35 +101,56 @@ local function releaseAllKeys()
     end
 end
 
-local function findDollarElements(gui)
-    -- Проверяем, является ли элемент TextLabel, TextBox или TextButton
+local function findStrictDollarElements(gui, results)
+    results = results or {}
+    
+    -- Проверяем только текстовые элементы
     if gui:IsA("TextLabel") or gui:IsA("TextBox") or gui:IsA("TextButton") then
-        -- Проверяем, содержит ли текст знак доллара
-        if string.find(gui.Text, "$") then
-            print("Найден элемент с $:", gui:GetFullName(), "| Текст:", gui.Text)
+        local text = gui.Text
+        
+        -- Проверяем строгое соответствие шаблону: $ и цифры, ничего больше
+        if string.match(text, "^%$%d+$") then
+            table.insert(results, {
+                Instance = gui,
+                Path = gui:GetFullName(),
+                Text = text,
+                Value = tonumber(text:sub(2)) -- Убираем $ и преобразуем в число
+            })
         end
     end
     
-    -- Рекурсивно проверяем все дочерние элементы
+    -- Рекурсивно проверяем дочерние элементы
     for _, child in ipairs(gui:GetChildren()) do
-        findDollarElements(child)
+        findStrictDollarElements(child, results)
     end
+    
+    return results
 end
 
--- Функция для поиска элементов с $ во всем PlayerGui
-local function scanAllGuiForDollars()
+local function scanForExactDollarValues()
     local player = Players.LocalPlayer
-    if not player then return end
+    if not player then return {} end
     
     local playerGui = player:FindFirstChild("PlayerGui")
     if not playerGui then
         warn("PlayerGui не найден")
-        return
+        return {}
     end
     
-    print("Начинаем поиск элементов с $ в интерфейсе...")
-    findDollarElements(playerGui)
-    print("Поиск завершен")
+    print("Поиск элементов с строгим форматом $числа...")
+    local dollarElements = findStrictDollarElements(playerGui)
+    
+    if #dollarElements > 0 then
+        print(string.format("\nНайдено %d элементов:", #dollarElements))
+        for i, item in ipairs(dollarElements) do
+            print(string.format("%d. %s = %s (число: %d)", 
+                  i, item.Path, item.Text, item.Value))
+        end
+    else
+        print("Элементы с форматом $числа не найдены")
+    end
+    
+    return dollarElements
 end
 
 local function getPlayerBalance()
@@ -432,6 +453,9 @@ if Players.LocalPlayer.Character then
 end
 
 -- Запускаем основные функции
-scanAllGuiForDollars()
-findBrainrot()
-collectMoney()
+if #exactDollarElements > 0 then
+    local balanceElement = exactDollarElements[1].Instance
+    print("Основной элемент баланса:", balanceElement:GetFullName())
+end
+--findBrainrot()
+--collectMoney()
